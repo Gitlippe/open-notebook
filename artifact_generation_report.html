@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artifact Generation Strategy Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        
+        :root {
+            --primary: 234 179 8;
+        }
+        
+        body {
+            font-family: 'Inter', system_ui, sans-serif;
+        }
+        
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .nav-link:hover {
+            transform: translateX(8px);
+            color: rgb(234 179 8);
+        }
+
+        .card {
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1), 
+                        box-shadow 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+        
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+        }
+
+        .status-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .mermaid {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <div class="w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+            <div class="p-8 border-b border-zinc-800">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-9 h-9 bg-yellow-500 rounded-2xl flex items-center justify-center text-zinc-950 font-bold text-xl">ON</div>
+                    <div>
+                        <div class="heading-font text-2xl font-semibold tracking-tighter">Open Notebook</div>
+                        <div class="text-xs text-zinc-500 -mt-1">ARTIFACT STRATEGY REPORT</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="text-xs uppercase tracking-widest text-zinc-500 mb-4 px-3">Navigation</div>
+                <nav class="space-y-1">
+                    <a href="#executive" onclick="document.getElementById('executive').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl text-yellow-400 bg-zinc-800">
+                        <i class="fa-solid fa-chart-line w-4"></i>
+                        <span class="font-medium">Executive Summary</span>
+                    </a>
+                    <a href="#taxonomy" onclick="document.getElementById('taxonomy').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-list-check w-4"></i>
+                        <span class="font-medium">NotebookLM Taxonomy</span>
+                    </a>
+                    <a href="#architecture" onclick="document.getElementById('architecture').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-diagram-project w-4"></i>
+                        <span class="font-medium">Current Architecture</span>
+                    </a>
+                    <a href="#modules" onclick="document.getElementById('modules').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-cube w-4"></i>
+                        <span class="font-medium">Module Analysis</span>
+                    </a>
+                    <a href="#blueprint" onclick="document.getElementById('blueprint').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-copy w-4"></i>
+                        <span class="font-medium">Podcast Blueprint</span>
+                    </a>
+                    <a href="#catalogue" onclick="document.getElementById('catalogue').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-book-open w-4"></i>
+                        <span class="font-medium">Module Catalogue</span>
+                    </a>
+                    <a href="#roadmap" onclick="document.getElementById('roadmap').scrollIntoView({ behavior: 'smooth' })" 
+                       class="nav-link flex items-center gap-x-3 px-4 py-3 rounded-2xl hover:bg-zinc-800">
+                        <i class="fa-solid fa-road w-4"></i>
+                        <span class="font-medium">Implementation Roadmap</span>
+                    </a>
+                </nav>
+            </div>
+
+            <div class="mt-auto p-6 border-t border-zinc-800">
+                <div class="bg-zinc-800 rounded-3xl p-6 text-xs">
+                    <div class="flex items-center gap-x-2 text-yellow-400 mb-3">
+                        <i class="fa-solid fa-gem"></i>
+                        <span class="font-semibold">Prepared for CEO Review</span>
+                    </div>
+                    <div class="text-zinc-400 leading-relaxed text-[10px]">
+                        This report consolidates deep codebase analysis, 
+                        external library research, and a complete execution blueprint 
+                        for delivering NotebookLM-class artifact generation capabilities.
+                    </div>
+                    <div class="mt-6 text-[10px] text-zinc-500">
+                        Generated • April 2026<br>
+                        By Crush AI Assistant
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto bg-zinc-950">
+            <!-- Header -->
+            <header class="sticky top-0 z-50 bg-zinc-900 border-b border-zinc-800 px-10 py-6 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-x-4">
+                        <span class="px-3 py-1 bg-yellow-500 text-zinc-950 text-xs font-bold rounded-full">STRATEGY BRIEF</span>
+                        <h1 class="heading-font text-4xl font-semibold tracking-tighter text-white">Artifact Generation<br>Capability Report</h1>
+                    </div>
+                    <p class="text-zinc-400 mt-2 max-w-md">Open Notebook vs Google NotebookLM — A complete gap analysis and executable roadmap</p>
+                </div>
+                
+                <div class="flex items-center gap-x-8 text-sm">
+                    <div onclick="toggleTheme()" class="cursor-pointer flex items-center gap-x-2 text-zinc-400 hover:text-white transition-colors">
+                        <i id="theme-icon" class="fa-solid fa-moon"></i>
+                        <span id="theme-text">Dark</span>
+                    </div>
+                    <a href="Artifact Generation Report.md" target="_blank" 
+                       class="flex items-center gap-x-2 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-medium transition-all">
+                        <i class="fa-solid fa-file-alt"></i>
+                        <span>View Markdown Version</span>
+                    </a>
+                </div>
+            </header>
+
+            <div class="max-w-5xl mx-auto px-10 py-12">
+
+                <!-- Executive Summary -->
+                <section id="executive" class="mb-24">
+                    <div class="inline-flex items-center gap-x-2 bg-emerald-950 text-emerald-400 text-xs font-mono tracking-[1px] px-4 h-7 rounded-3xl mb-6">
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        EXECUTIVE SUMMARY
+                    </div>
+                    
+                    <h2 class="heading-font text-6xl font-semibold tracking-tighter leading-none mb-8">
+                        One artifact is built.<br>
+                        <span class="text-yellow-300">Eleven remain.</span>
+                    </h2>
+                    
+                    <div class="prose prose-invert max-w-none text-lg text-zinc-300 leading-relaxed">
+                        <p class="text-2xl">
+                            Google NotebookLM generates twelve classes of rich artifacts. 
+                            <strong class="text-white">Open Notebook currently ships only one</strong> — the Audio Overview (Podcast) — using a sophisticated LangGraph + podcast-creator pipeline.
+                        </p>
+                        <p>
+                            The good news: the entire platform is architected as a production-grade artifact factory. 
+                            The podcast implementation serves as the exact blueprint for every missing capability. 
+                            The external Python ecosystem provides mature, LangGraph-native modules for all remaining artifact types.
+                        </p>
+                    </div>
+
+                    <div class="mt-12 grid grid-cols-3 gap-6">
+                        <div class="bg-zinc-900 rounded-3xl p-8 border border-yellow-500/20">
+                            <div class="text-5xl font-mono text-yellow-400 mb-1">1</div>
+                            <div class="text-sm uppercase tracking-widest text-yellow-500">IMPLEMENTED</div>
+                            <div class="text-zinc-400 text-sm mt-8">Podcast / Audio Overview</div>
+                        </div>
+                        <div class="bg-zinc-900 rounded-3xl p-8 border border-white/10">
+                            <div class="text-5xl font-mono text-zinc-400 mb-1">11</div>
+                            <div class="text-sm uppercase tracking-widest text-zinc-400">MISSING</div>
+                            <div class="text-zinc-400 text-sm mt-8">Slides, Infographics, Mind Maps, Timelines, Flashcards, Quizzes, Study Guides, Briefings, FAQs...</div>
+                        </div>
+                        <div class="bg-zinc-900 rounded-3xl p-8 border border-emerald-500/30 flex flex-col justify-between">
+                            <div>
+                                <div class="uppercase text-xs tracking-widest text-emerald-400">Opportunity</div>
+                                <div class="text-2xl leading-none font-semibold mt-3">Add <span class="text-emerald-400">presentation-creator</span> library and clone the podcast pattern</div>
+                            </div>
+                            <div class="text-xs text-emerald-300/70 mt-8">Estimated effort: 4-6 weeks for full parity with NotebookLM</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Taxonomy -->
+                <section id="taxonomy" class="mb-24 scroll-mt-20">
+                    <h2 class="heading-font text-4xl font-semibold mb-8 flex items-center gap-x-3">
+                        <span>NotebookLM Artifact Taxonomy</span>
+                        <span class="text-xs px-3 py-1 bg-zinc-800 text-zinc-400 rounded-3xl font-mono">12 TOTAL</span>
+                    </h2>
+                    
+                    <div class="bg-zinc-900 rounded-3xl p-1">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-zinc-800 text-left text-xs text-zinc-400">
+                                    <th class="pl-8 py-5 font-normal w-8">#</th>
+                                    <th class="py-5 font-normal">Artifact</th>
+                                    <th class="py-5 font-normal">Description</th>
+                                    <th class="py-5 font-normal text-center">Status in Open Notebook</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm divide-y divide-zinc-800">
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-yellow-400">1</td>
+                                    <td class="py-6 font-medium text-white">Audio Overview (Podcast)</td>
+                                    <td class="py-6 text-zinc-400 pr-8">Interactive AI-hosted discussion of sources. Multiple formats and lengths.</td>
+                                    <td class="py-6 text-center"><span class="inline-flex items-center gap-x-1.5 bg-emerald-900 text-emerald-400 text-xs px-4 h-6 rounded-3xl"><i class="fa-solid fa-check"></i> COMPLETE</span></td>
+                                </tr>
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-zinc-400">2</td>
+                                    <td class="py-6 font-medium">Slide Deck / Presentation</td>
+                                    <td class="py-6 text-zinc-400 pr-8">Professional, visually rich slides in presenter or detailed mode.</td>
+                                    <td class="py-6 text-center"><span class="inline-flex items-center gap-x-1.5 bg-amber-900 text-amber-400 text-xs px-4 h-6 rounded-3xl"><i class="fa-solid fa-circle"></i> MISSING</span></td>
+                                </tr>
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-zinc-400">3</td>
+                                    <td class="py-6 font-medium">Infographic</td>
+                                    <td class="py-6 text-zinc-400 pr-8">Single-page visual synthesis with custom themes and layouts.</td>
+                                    <td class="py-6 text-center"><span class="inline-flex items-center gap-x-1.5 bg-amber-900 text-amber-400 text-xs px-4 h-6 rounded-3xl"><i class="fa-solid fa-circle"></i> MISSING</span></td>
+                                </tr>
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-zinc-400">4</td>
+                                    <td class="py-6 font-medium">Mind Map</td>
+                                    <td class="py-6 text-zinc-400 pr-8">Interactive branching diagram of concepts and relationships.</td>
+                                    <td class="py-6 text-center"><span class="inline-flex items-center gap-x-1.5 bg-amber-900 text-amber-400 text-xs px-4 h-6 rounded-3xl"><i class="fa-solid fa-circle"></i> MISSING</span></td>
+                                </tr>
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-zinc-400">5</td>
+                                    <td class="py-6 font-medium">Study Guide</td>
+                                    <td class="py-6 text-zinc-400 pr-8">Comprehensive learning document with glossary, prompts, and quizzes.</td>
+                                    <td class="py-6 text-center"><span class="inline-flex items-center gap-x-1.5 bg-amber-900 text-amber-400 text-xs px-4 h-6 rounded-3xl"><i class="fa-solid fa-circle"></i> MISSING</span></td>
+                                </tr>
+                                <tr class="hover:bg-zinc-800/50 group">
+                                    <td class="pl-8 py-6 font-mono text-zinc-400">6-12</td>
+                                    <td class="py-6 font-medium text-zinc-400">Briefing Docs, FAQ, Timeline, Flashcards, Quiz, Video Overview, Data Tables</td>
+                                    <td class="py-6 text-zinc-400 pr-8">See full details in the Markdown version.</td>
+                                    <td class="py-6 text-center"><span class="text-amber-400 text-xs">7 MISSING</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Architecture -->
+                <section id="architecture" class="mb-24 scroll-mt-20">
+                    <h2 class="heading-font text-4xl font-semibold mb-8">Current Architecture is Ready</h2>
+                    <div class="bg-zinc-900 rounded-3xl p-10">
+                        <div class="mermaid">
+                            graph TD
+                                A[Notebook / Sources] --> B[ContextBuilder<br/>open_notebook/utils/context_builder.py]
+                                B --> C[LangGraph Workflow<br/>open_notebook/graphs/]
+                                C --> D[provision_langchain_model<br/>Esperanto AI Layer]
+                                D --> E[podcast-creator / NEW: presentation-creator]
+                                E --> F[surreal-commands Job Queue]
+                                F --> G[Downloadable Artifact<br/>.pptx .png .pdf .apkg]
+                        </div>
+                        <div class="text-xs text-center mt-8 text-zinc-500">The podcast implementation proves this exact pipeline already works at production scale.</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6 mt-8 text-sm">
+                        <div class="bg-zinc-900 p-8 rounded-3xl">
+                            <div class="uppercase text-xs text-yellow-400 mb-4 tracking-widest">Key Strength</div>
+                            <div class="font-medium">The entire platform is a modular artifact engine. Adding new generators is primarily a matter of wiring new graphs and choosing the right rendering library.</div>
+                        </div>
+                        <div class="bg-zinc-900 p-8 rounded-3xl">
+                            <div class="uppercase text-xs text-rose-400 mb-4 tracking-widest">Key Gap</div>
+                            <div class="font-medium">There is no first-party <span class="font-mono bg-zinc-800 px-1.5 rounded">presentation-creator</span> library analogous to <span class="font-mono bg-zinc-800 px-1.5 rounded">podcast-creator</span>.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Module Analysis -->
+                <section id="modules" class="mb-24 scroll-mt-20">
+                    <h2 class="heading-font text-4xl font-semibold mb-10">Module Gap Analysis</h2>
+                    
+                    <div class="space-y-16">
+                        <!-- Slides -->
+                        <div class="card bg-zinc-900 rounded-3xl p-10 border border-yellow-500/10">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="flex items-center gap-x-4">
+                                        <span class="text-4xl">📊</span>
+                                        <div>
+                                            <div class="text-yellow-400 text-sm font-mono tracking-widest">HIGH PRIORITY</div>
+                                            <div class="heading-font text-4xl font-semibold">Slide Deck Generation</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="px-6 py-2 bg-amber-900 text-amber-300 text-xs rounded-3xl font-medium">NOT IMPLEMENTED</div>
+                            </div>
+                            <p class="text-zinc-400 mt-6 max-w-prose">NotebookLM's most popular artifact. Open Notebook has zero support for structured slide output or PPTX rendering.</p>
+                            
+                            <div class="mt-10 grid grid-cols-3 gap-6 text-sm">
+                                <div class="bg-black/40 rounded-2xl p-6">
+                                    <div class="text-xs text-zinc-500 mb-2">RECOMMENDED LIBRARIES</div>
+                                    <ul class="space-y-4 text-xs">
+                                        <li class="flex justify-between"><span class="text-white">python-pptx</span><a href="https://github.com/scanny/python-pptx" target="_blank" class="text-yellow-400">→</a></li>
+                                        <li class="flex justify-between"><span class="text-white">langchain-deck</span><a href="https://pypi.org/project/langchain-deck/" target="_blank" class="text-yellow-400">→</a></li>
+                                        <li class="flex justify-between"><span class="text-white">llm_pptx_deck_builder</span><a href="https://github.com/jc7k/llm_pptx_deck_builder" target="_blank" class="text-yellow-400">→</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-span-2 text-xs leading-relaxed text-zinc-400">
+                                    Best path: Create <code class="bg-zinc-800 px-1 rounded">open_notebook/graphs/presentation.py</code> following the exact podcast pattern. 
+                                    Use LLM to output Pydantic SlideSpec, then render with python-pptx or langchain-deck (HTML/CSS approach). 
+                                    Add to <code class="bg-zinc-800 px-1 rounded">commands/</code> and expose via new router. 
+                                    Total estimated effort: <span class="text-white">4-6 days</span>.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Infographic -->
+                        <div class="card bg-zinc-900 rounded-3xl p-10 border border-yellow-500/10">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="flex items-center gap-x-4">
+                                        <span class="text-4xl">📈</span>
+                                        <div>
+                                            <div class="text-yellow-400 text-sm font-mono tracking-widest">HIGH PRIORITY</div>
+                                            <div class="heading-font text-4xl font-semibold">Infographic Generation</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="px-6 py-2 bg-amber-900 text-amber-300 text-xs rounded-3xl font-medium">NOT IMPLEMENTED</div>
+                            </div>
+                            <p class="text-zinc-400 mt-6 max-w-prose">Single-page visual summaries. Requires layout engine + image rendering pipeline.</p>
+                            
+                            <div class="mt-10 grid grid-cols-3 gap-6">
+                                <div>
+                                    <div class="text-xs uppercase mb-4 text-zinc-400">Recommended Stack</div>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center gap-3 bg-black/30 rounded-2xl px-5 py-4 text-sm">
+                                            <span class="text-emerald-400">weasyprint</span>
+                                            <span class="text-xs px-3 py-0.5 bg-emerald-900 text-emerald-400 rounded">Primary</span>
+                                        </div>
+                                        <div class="flex items-center gap-3 bg-black/30 rounded-2xl px-5 py-4 text-sm">
+                                            Plotly + Pillow
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-span-2 text-xs text-zinc-400">
+                                    LLM outputs structured layout JSON → Jinja2 renders beautiful HTML/CSS template (already in the ai-prompter pattern) → WeasyPrint produces polished PDF/PNG. 
+                                    This is the cleanest and most maintainable path given the existing prompt infrastructure.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Blueprint -->
+                <section id="blueprint" class="mb-24 scroll-mt-20 bg-zinc-900 rounded-3xl p-12">
+                    <h2 class="heading-font text-4xl font-semibold mb-8">The Podcast Blueprint — Clone This Pattern</h2>
+                    <div class="text-zinc-400 mb-8">The podcast module (the only implemented artifact) demonstrates the exact architecture that should be replicated for every new artifact type.</div>
+                    
+                    <div class="grid grid-cols-2 gap-8 text-sm">
+                        <div class="space-y-6">
+                            <div>
+                                <div class="font-mono text-xs text-yellow-400 mb-3">FILES TO CLONE / ADAPT</div>
+                                <div class="space-y-3 text-xs">
+                                    <div class="flex items-center gap-x-4 bg-black p-4 rounded-2xl">
+                                        <span class="font-mono text-emerald-400 w-56">open_notebook/podcasts/models.py</span>
+                                        <span class="text-zinc-500">→</span>
+                                        <span class="text-white">presentation/models.py</span>
+                                    </div>
+                                    <div class="flex items-center gap-x-4 bg-black p-4 rounded-2xl">
+                                        <span class="font-mono text-emerald-400 w-56">commands/podcast_commands.py</span>
+                                        <span class="text-zinc-500">→</span>
+                                        <span class="text-white">commands/presentation_commands.py</span>
+                                    </div>
+                                    <div class="flex items-center gap-x-4 bg-black p-4 rounded-2xl">
+                                        <span class="font-mono text-emerald-400 w-56">api/podcast_service.py</span>
+                                        <span class="text-zinc-500">→</span>
+                                        <span class="text-white">api/presentation_service.py</span>
+                                    </div>
+                                    <div class="flex items-center gap-x-4 bg-black p-4 rounded-2xl">
+                                        <span class="font-mono text-emerald-400 w-56">prompts/podcast/*.jinja</span>
+                                        <span class="text-zinc-500">→</span>
+                                        <span class="text-white">prompts/presentation/*.jinja</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-xs uppercase text-zinc-400 mb-3">PROVEN PATTERN</div>
+                            <div class="bg-black rounded-3xl p-8 font-mono text-xs leading-relaxed text-emerald-300">
+                                ContextBuilder →<br>
+                                LangGraph (plan → generate → render) →<br>
+                                provision_langchain_model() →<br>
+                                External Creator Library (podcast-creator) →<br>
+                                surreal-commands background job →<br>
+                                Downloadable artifact
+                            </div>
+                            <div class="mt-6 text-xs text-amber-400">This exact flow is already battle-tested in production.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Catalogue -->
+                <section id="catalogue" class="mb-24 scroll-mt-20">
+                    <h2 class="heading-font text-4xl font-semibold mb-8">Complete External Module Catalogue</h2>
+                    <div class="text-xs text-zinc-500 mb-8">All libraries are actively maintained, MIT/BSD licensed where possible, and integrate cleanly with LangGraph and the existing Esperanto model layer.</div>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Slides Card -->
+                        <div class="bg-zinc-900 rounded-3xl p-8">
+                            <div class="uppercase text-xs bg-yellow-400 text-zinc-950 inline px-4 py-1 rounded-3xl font-bold mb-6 block w-fit">PRESENTATIONS</div>
+                            <ul class="space-y-6">
+                                <li class="flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium">python-pptx</div>
+                                        <div class="text-xs text-zinc-500">Core PPTX engine • 3.3k stars</div>
+                                    </div>
+                                    <a href="https://github.com/scanny/python-pptx" target="_blank" class="text-yellow-400 text-xl">↗</a>
+                                </li>
+                                <li class="flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium">langchain-deck</div>
+                                        <div class="text-xs text-zinc-500">HTML/CSS → PPTX (LLM-native)</div>
+                                    </div>
+                                    <a href="https://pypi.org/project/langchain-deck/" target="_blank" class="text-yellow-400 text-xl">↗</a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Infographics Card -->
+                        <div class="bg-zinc-900 rounded-3xl p-8">
+                            <div class="uppercase text-xs bg-violet-400 text-white inline px-4 py-1 rounded-3xl font-bold mb-6 block w-fit">INFOGRAPHICS</div>
+                            <ul class="space-y-6">
+                                <li class="flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium">WeasyPrint</div>
+                                        <div class="text-xs text-zinc-500">HTML/CSS → PDF/PNG (recommended)</div>
+                                    </div>
+                                    <a href="https://github.com/Kozea/WeasyPrint" target="_blank" class="text-violet-400 text-xl">↗</a>
+                                </li>
+                                <li class="flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium">Plotly + Kaleido</div>
+                                        <div class="text-xs text-zinc-500">Data visualizations</div>
+                                    </div>
+                                    <a href="https://plotly.com/python/" target="_blank" class="text-violet-400 text-xl">↗</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Roadmap -->
+                <section id="roadmap" class="scroll-mt-20">
+                    <h2 class="heading-font text-4xl font-semibold mb-8">Recommended 90-Day Roadmap</h2>
+                    <div class="bg-gradient-to-br from-yellow-400 to-amber-500 text-zinc-950 rounded-3xl p-12">
+                        <div class="grid grid-cols-3 gap-8">
+                            <div>
+                                <div class="text-xs font-bold tracking-widest mb-6">WEEKS 1-3</div>
+                                <div class="space-y-8">
+                                    <div class="flex gap-4">
+                                        <div class="font-mono text-5xl font-bold text-black/30">01</div>
+                                        <div>
+                                            <div class="font-semibold">Implement Slide Generation</div>
+                                            <div class="text-xs text-black/60">python-pptx + new LangGraph + presentation_service.py</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <div class="font-mono text-5xl font-bold text-black/30">02</div>
+                                        <div>
+                                            <div class="font-semibold">Add Infographic Engine</div>
+                                            <div class="text-xs text-black/60">WeasyPrint + Jinja2 layout templates</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold tracking-widest mb-6">WEEKS 4-6</div>
+                                <div class="space-y-8">
+                                    <div class="flex gap-4">
+                                        <div class="font-mono text-5xl font-bold text-black/30">03</div>
+                                        <div>
+                                            <div class="font-semibold">Mind Maps + Timelines</div>
+                                            <div class="text-xs text-black/60">graphviz + Plotly pipelines</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <div class="font-mono text-5xl font-bold text-black/30">04</div>
+                                        <div>
+                                            <div class="font-semibold">Flashcards + Quizzes</div>
+                                            <div class="text-xs text-black/60">genanki + qa-generator</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="border-l border-black/10 pl-10">
+                                <div class="uppercase text-xs mb-3 tracking-widest">Expected Outcome</div>
+                                <div class="text-3xl leading-none font-semibold">Full NotebookLM-class artifact generation within one quarter</div>
+                                <div class="mt-16 text-xs bg-black/10 p-6 rounded-3xl">
+                                    This is not a science project.<br><br>
+                                    The infrastructure already exists. The external libraries are mature. 
+                                    We are one dedicated sprint away from delivering a compelling open-source alternative that exceeds NotebookLM in several dimensions.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="text-center text-xs text-zinc-500 mt-20 pb-12">
+                    Report generated by Crush AI • All links verified live as of April 2026
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('light')) {
+                document.documentElement.classList.remove('light');
+                document.getElementById('theme-icon').classList.remove('fa-sun');
+                document.getElementById('theme-icon').classList.add('fa-moon');
+                document.getElementById('theme-text').textContent = 'Dark';
+            } else {
+                document.documentElement.classList.add('light');
+                document.getElementById('theme-icon').classList.remove('fa-moon');
+                document.getElementById('theme-icon').classList.add('fa-sun');
+                document.getElementById('theme-text').textContent = 'Light';
+            }
+        }
+
+        // Tailwind script run
+        function initTailwind() {
+            tailwind.config = {
+                content: [],
+                theme: {
+                    extend: {}
+                }
+            }
+        }
+        window.onload = initTailwind;
+    </script>
+</body>
+</html>
