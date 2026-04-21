@@ -41,6 +41,9 @@ dependencies = [
     "numpy>=2.4.1",
     "pycountry>=26.2.16",
     "babel>=2.18.0",
+    "matplotlib>=3.10.8",
+    "genanki>=0.13.1",
+    "graphviz>=0.21",
 ]
 
 [tool.setuptools]
