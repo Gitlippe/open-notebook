@@ -142,3 +142,5 @@ specs/
 .harness/
 
 .mcp.json
+demos/_output/
+.artifact_output/
