@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Download, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 
-import { ArtifactJobResult, ArtifactFile } from '@/lib/types/artifacts'
+import { ArtifactJobResult, ArtifactFile, ArtifactProvenance, ArtifactProvenanceCall } from '@/lib/types/artifacts'
 import { artifactsApi } from '@/lib/api/artifacts'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +24,6 @@ function MarkdownRenderer({ url }: { url: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Lazy-load the text on first render
   if (text === null && !loading && !error) {
     setLoading(true)
     fetch(url)
@@ -79,7 +78,9 @@ function VideoRenderer({ url }: { url: string }) {
       src={url}
       className="w-full rounded border"
       style={{ maxHeight: '60vh' }}
-    />
+    >
+      Your browser does not support the video tag.
+    </video>
   )
 }
 
@@ -116,7 +117,6 @@ function DownloadOnlyRenderer({ file, t }: { file: ArtifactFile; t: (key: string
   const isPptx =
     file.mime_type ===
     'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-
   const downloadHref = artifactsApi.downloadUrl(file.path)
 
   return (
@@ -150,22 +150,11 @@ function FilePreview({ file, artifact }: { file: ArtifactFile; artifact: Artifac
   const mime = file.mime_type
 
   const renderContent = () => {
-    if (mime === 'text/markdown') {
-      return <MarkdownRenderer url={downloadHref} />
-    }
-    if (mime === 'text/html') {
-      return <HtmlRenderer url={downloadHref} />
-    }
-    if (mime.startsWith('image/')) {
-      return <ImageRenderer url={downloadHref} alt={artifact.title ?? 'Artifact image'} />
-    }
-    if (mime === 'video/mp4') {
-      return <VideoRenderer url={downloadHref} />
-    }
-    if (mime === 'application/json') {
-      return <JsonRenderer url={downloadHref} />
-    }
-    // Word / Excel / PPTX / unknown
+    if (mime === 'text/markdown') return <MarkdownRenderer url={downloadHref} />
+    if (mime === 'text/html') return <HtmlRenderer url={downloadHref} />
+    if (mime.startsWith('image/')) return <ImageRenderer url={downloadHref} alt={artifact.title ?? 'Artifact image'} />
+    if (mime === 'video/mp4') return <VideoRenderer url={downloadHref} />
+    if (mime === 'application/json') return <JsonRenderer url={downloadHref} />
     return <DownloadOnlyRenderer file={file} t={t} />
   }
 
@@ -189,12 +178,12 @@ function FilePreview({ file, artifact }: { file: ArtifactFile; artifact: Artifac
 
 // ─── Provenance block ─────────────────────────────────────────────────────────
 
-function ProvenanceBlock({ artifact }: { artifact: ArtifactJobResult }) {
+function ProvenanceBlock({ provenance }: { provenance: ArtifactProvenance }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
-  const p = artifact.provenance
-  if (!p) return null
+  const calls = (provenance.calls ?? []) as ArtifactProvenanceCall[]
+  const callCount = calls.length
 
   return (
     <div className="border rounded-md overflow-hidden">
@@ -209,52 +198,43 @@ function ProvenanceBlock({ artifact }: { artifact: ArtifactJobResult }) {
       {open ? (
         <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground bg-background">
           <div className="grid grid-cols-2 gap-1.5">
-            {p.provider ? (
+            {provenance.provider ? (
               <>
                 <span className="font-medium text-foreground">Provider</span>
-                <span>{p.provider}</span>
+                <span>{String(provenance.provider)}</span>
               </>
             ) : null}
-            {p.model_id ? (
+            {provenance.model_id ? (
               <>
                 <span className="font-medium text-foreground">Model</span>
-                <span className="truncate">{p.model_id}</span>
+                <span className="truncate">{String(provenance.model_id)}</span>
               </>
             ) : null}
-            {p.call_count !== undefined ? (
+            {callCount > 0 ? (
               <>
                 <span className="font-medium text-foreground">LLM calls</span>
-                <span>{p.call_count}</span>
-              </>
-            ) : null}
-            {p.total_tokens !== undefined ? (
-              <>
-                <span className="font-medium text-foreground">Total tokens</span>
-                <span>{p.total_tokens.toLocaleString()}</span>
+                <span>{callCount}</span>
               </>
             ) : null}
           </div>
 
-          {p.calls && p.calls.length > 0 ? (
+          {calls.length > 0 ? (
             <details>
               <summary className="cursor-pointer font-medium text-foreground">
-                {p.calls.length} call{p.calls.length !== 1 ? 's' : ''}
+                {calls.length} call{calls.length !== 1 ? 's' : ''}
               </summary>
               <div className="mt-2 space-y-1.5">
-                {p.calls.map((call, i) => (
+                {calls.map((call, i) => (
                   <div key={i} className="rounded bg-muted/40 p-2 space-y-0.5">
-                    <p>
-                      <span className="font-medium text-foreground">in:</span>{' '}
-                      {call.tokens_in?.toLocaleString() ?? '—'} tokens
-                    </p>
-                    <p>
-                      <span className="font-medium text-foreground">out:</span>{' '}
-                      {call.tokens_out?.toLocaleString() ?? '—'} tokens
-                    </p>
-                    <p>
-                      <span className="font-medium text-foreground">latency:</span>{' '}
-                      {call.latency_ms ? `${call.latency_ms}ms` : '—'}
-                    </p>
+                    {call.tokens_in != null ? (
+                      <p><span className="font-medium text-foreground">in:</span> {call.tokens_in.toLocaleString()} tokens</p>
+                    ) : null}
+                    {call.tokens_out != null ? (
+                      <p><span className="font-medium text-foreground">out:</span> {call.tokens_out.toLocaleString()} tokens</p>
+                    ) : null}
+                    {call.latency_ms != null ? (
+                      <p><span className="font-medium text-foreground">latency:</span> {call.latency_ms}ms</p>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -313,7 +293,9 @@ export function ArtifactPreview({ artifact, open, onClose }: ArtifactPreviewProp
               )}
 
               {/* Provenance */}
-              <ProvenanceBlock artifact={artifact} />
+              {artifact.provenance ? (
+                <ProvenanceBlock provenance={artifact.provenance} />
+              ) : null}
             </div>
           ) : null}
         </ScrollArea>

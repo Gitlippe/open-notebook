@@ -6,7 +6,11 @@ import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { useArtifactTypes, useGenerateArtifact, useArtifactJob } from '@/lib/hooks/use-artifacts'
 import { useArtifactsStore } from '@/lib/stores/artifacts-store'
 import { useNotebooks } from '@/lib/hooks/use-notebooks'
-import { ArtifactType, ArtifactJobResult } from '@/lib/types/artifacts'
+import {
+  ArtifactType,
+  ArtifactJobResult,
+  TERMINAL_ARTIFACT_STATUSES,
+} from '@/lib/types/artifacts'
 import { artifactsApi } from '@/lib/api/artifacts'
 import { ArtifactTypeSelector } from './ArtifactTypeSelector'
 
@@ -31,17 +35,17 @@ type Step = 'type' | 'sources' | 'config' | 'progress'
 // ─── Per-type optional config fields ─────────────────────────────────────────
 
 const TYPE_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: string; placeholder?: string }>> = {
-  flashcards:  [{ key: 'max_items', label: 'Max cards',   type: 'number', placeholder: '20' }],
+  flashcards:  [{ key: 'max_items', label: 'Max cards',     type: 'number', placeholder: '20' }],
   quiz:        [{ key: 'max_items', label: 'Max questions', type: 'number', placeholder: '10' }],
-  timeline:    [{ key: 'max_items', label: 'Max events',  type: 'number', placeholder: '15' }],
-  slide_deck:  [{ key: 'max_items', label: 'Max slides',  type: 'number', placeholder: '12' }],
-  pitch_deck:  [{ key: 'max_items', label: 'Max slides',  type: 'number', placeholder: '10' }],
+  timeline:    [{ key: 'max_items', label: 'Max events',    type: 'number', placeholder: '15' }],
+  slide_deck:  [{ key: 'max_items', label: 'Max slides',    type: 'number', placeholder: '12' }],
+  pitch_deck:  [{ key: 'max_items', label: 'Max slides',    type: 'number', placeholder: '10' }],
   faq:         [{ key: 'max_items', label: 'Max Q&A pairs', type: 'number', placeholder: '15' }],
-  study_guide: [{ key: 'max_items', label: 'Max sections', type: 'number', placeholder: '8' }],
-  data_tables: [{ key: 'max_items', label: 'Max rows',    type: 'number', placeholder: '50' }],
+  study_guide: [{ key: 'max_items', label: 'Max sections',  type: 'number', placeholder: '8'  }],
+  data_tables: [{ key: 'max_items', label: 'Max rows',      type: 'number', placeholder: '50' }],
 }
 
-// ─── Steps ────────────────────────────────────────────────────────────────────
+// ─── Step indicator ───────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { id: Step; label: string }[] = [
@@ -74,41 +78,37 @@ function StepIndicator({ current }: { current: Step }) {
 
 function ProgressView({
   jobId,
-  artifactType,
+  artifactTypeId,
   onComplete,
 }: {
   jobId: string
-  artifactType: string
+  artifactTypeId: string
   onComplete: (result: ArtifactJobResult) => void
 }) {
   const { t } = useTranslation()
-  const { job } = useArtifactJob(jobId)
-  const { addCompletedArtifact } = useArtifactsStore()
+  const { data: job } = useArtifactJob(jobId)
   const [elapsed, setElapsed] = useState(0)
   const [notifiedDone, setNotifiedDone] = useState(false)
 
-  // Tick elapsed seconds
   useEffect(() => {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  // Fire onComplete exactly once when the job reaches a terminal status
   useEffect(() => {
     if (!job || notifiedDone) return
-    if (job.status === 'completed' || job.status === 'failed' || job.status === 'error') {
+    if (TERMINAL_ARTIFACT_STATUSES.includes(job.status)) {
       setNotifiedDone(true)
       if (job.status === 'completed') {
-        addCompletedArtifact(job)
         onComplete(job)
       }
     }
-  }, [job, notifiedDone, addCompletedArtifact, onComplete])
+  }, [job, notifiedDone, onComplete])
 
   const status = job?.status ?? 'submitted'
-  const isRunning = status === 'submitted' || status === 'running' || status === 'processing'
+  const isRunning = !TERMINAL_ARTIFACT_STATUSES.includes(status)
   const isComplete = status === 'completed'
-  const isFailed = status === 'failed' || status === 'error'
+  const isFailed = status === 'failed'
 
   return (
     <div className="space-y-4 py-4">
@@ -130,7 +130,7 @@ function ProgressView({
               : t('artifacts.failed')}
           </p>
           <p className="text-xs text-muted-foreground capitalize">
-            {artifactType.replace(/_/g, ' ')}
+            {artifactTypeId.replace(/_/g, ' ')}
           </p>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />
@@ -139,22 +139,22 @@ function ProgressView({
         </div>
       </div>
 
-      {isFailed && job?.error_message ? (
+      {isFailed && job?.error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
           <p className="text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap">
-            {job.error_message}
+            {job.error}
           </p>
         </div>
       ) : null}
 
       {isComplete && job?.files && job.files.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
-            Files
-          </p>
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Files</p>
           {job.files.map((file, idx) => (
             <div key={idx} className="flex items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
-              <span className="truncate text-muted-foreground">{file.name ?? file.path.split('/').pop()}</span>
+              <span className="truncate text-muted-foreground">
+                {file.description ?? file.path.split('/').pop()}
+              </span>
               <Button asChild variant="outline" size="sm" className="h-6 text-xs shrink-0 gap-1">
                 <a href={artifactsApi.downloadUrl(file.path)} download>
                   {t('artifacts.download')}
@@ -184,52 +184,40 @@ export function GenerateArtifactDialog({
   onArtifactReady,
 }: GenerateArtifactDialogProps) {
   const { t } = useTranslation()
-  const { types, isLoading: loadingTypes } = useArtifactTypes()
+  const { data: typesData, isLoading: loadingTypes } = useArtifactTypes()
+  const types: ArtifactType[] = typesData ?? []
   const generateMutation = useGenerateArtifact()
   const { data: notebooks } = useNotebooks()
 
+  const { activeJobId, setActiveJobId, selectedArtifactType, setSelectedArtifactType, reset } =
+    useArtifactsStore()
+
   const [step, setStep] = useState<Step>('type')
-  const [selectedType, setSelectedType] = useState<ArtifactType | null>(null)
   const [notebookId, setNotebookId] = useState<string>(defaultNotebookId ?? '')
   const [inlineContent, setInlineContent] = useState('')
   const [title, setTitle] = useState('')
   const [configValues, setConfigValues] = useState<Record<string, string>>({})
-  const [activeJobId, setActiveJobId] = useState<string | null>(null)
 
-  // Reset state when dialog opens
   useEffect(() => {
     if (open) {
+      reset()
       setStep('type')
-      setSelectedType(null)
       setNotebookId(defaultNotebookId ?? '')
       setInlineContent('')
       setTitle('')
       setConfigValues({})
-      setActiveJobId(null)
     }
-  }, [open, defaultNotebookId])
+  }, [open, defaultNotebookId, reset])
 
   const handleClose = () => {
     onClose()
   }
 
-  const handleTypeSelect = (type: ArtifactType) => {
-    setSelectedType(type)
-  }
-
-  const handleNextFromType = () => {
-    if (selectedType) setStep('sources')
-  }
-
-  const handleNextFromSources = () => {
-    if (notebookId || inlineContent.trim()) setStep('config')
-  }
-
   const handleGenerate = () => {
-    if (!selectedType) return
+    if (!selectedArtifactType) return
 
     const config: Record<string, unknown> = {}
-    const fields = TYPE_CONFIG_FIELDS[selectedType.id] ?? []
+    const fields = TYPE_CONFIG_FIELDS[selectedArtifactType.type] ?? []
     for (const field of fields) {
       const val = configValues[field.key]
       if (val) {
@@ -239,9 +227,8 @@ export function GenerateArtifactDialog({
 
     generateMutation.mutate(
       {
-        artifact_type: selectedType.id,
+        artifact_type: selectedArtifactType.type,
         notebook_id: notebookId || undefined,
-        content: !notebookId && inlineContent ? inlineContent : undefined,
         title: title || undefined,
         config: Object.keys(config).length > 0 ? config : undefined,
       },
@@ -261,7 +248,17 @@ export function GenerateArtifactDialog({
     [onArtifactReady]
   )
 
-  const configFields = selectedType ? (TYPE_CONFIG_FIELDS[selectedType.id] ?? []) : []
+  const configFields = selectedArtifactType
+    ? (TYPE_CONFIG_FIELDS[selectedArtifactType.type] ?? [])
+    : []
+
+  const prevStep = (): Step => {
+    if (step === 'sources') return 'type'
+    if (step === 'config') return 'sources'
+    return 'type'
+  }
+
+  const typeLabel = selectedArtifactType?.type.replace(/_/g, ' ') ?? ''
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
@@ -272,32 +269,27 @@ export function GenerateArtifactDialog({
             {step === 'type'     && t('artifacts.pickType')}
             {step === 'sources'  && t('artifacts.selectSources')}
             {step === 'config'   && t('artifacts.configure')}
-            {step === 'progress' && (selectedType?.label ?? t('artifacts.generating'))}
+            {step === 'progress' && (typeLabel || t('artifacts.generating'))}
           </DialogDescription>
         </DialogHeader>
 
         <StepIndicator current={step} />
 
         <ScrollArea className="flex-1 pr-1 overflow-auto">
-          {/* Step 1 — Type */}
           {step === 'type' ? (
             <ArtifactTypeSelector
               types={types}
-              selected={selectedType?.id ?? null}
-              onSelect={handleTypeSelect}
+              selected={selectedArtifactType?.type ?? null}
+              onSelect={(at) => setSelectedArtifactType(at)}
               disabled={loadingTypes}
             />
           ) : null}
 
-          {/* Step 2 — Sources */}
           {step === 'sources' ? (
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
                 <Label htmlFor="notebook-select">Notebook (optional)</Label>
-                <Select
-                  value={notebookId}
-                  onValueChange={setNotebookId}
-                >
+                <Select value={notebookId} onValueChange={setNotebookId}>
                   <SelectTrigger id="notebook-select">
                     <SelectValue placeholder="Select a notebook…" />
                   </SelectTrigger>
@@ -331,7 +323,6 @@ export function GenerateArtifactDialog({
             </div>
           ) : null}
 
-          {/* Step 3 — Config */}
           {step === 'config' ? (
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
@@ -343,7 +334,7 @@ export function GenerateArtifactDialog({
                   id="artifact-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={`${selectedType?.label ?? 'Artifact'} title…`}
+                  placeholder={`${typeLabel || 'Artifact'} title…`}
                 />
               </div>
 
@@ -365,7 +356,7 @@ export function GenerateArtifactDialog({
 
               <div className="rounded-md border bg-muted/30 px-4 py-3 text-xs space-y-1 text-muted-foreground">
                 <p className="font-semibold text-foreground text-sm">Summary</p>
-                <p>Type: <span className="text-foreground capitalize">{selectedType?.label}</span></p>
+                <p>Type: <span className="text-foreground capitalize">{typeLabel}</span></p>
                 {notebookId ? (
                   <p>Source: <span className="text-foreground">Notebook</span></p>
                 ) : (
@@ -375,26 +366,22 @@ export function GenerateArtifactDialog({
             </div>
           ) : null}
 
-          {/* Step 4 — Progress */}
           {step === 'progress' && activeJobId ? (
             <ProgressView
               jobId={activeJobId}
-              artifactType={selectedType?.id ?? ''}
+              artifactTypeId={selectedArtifactType?.type ?? ''}
               onComplete={handleArtifactComplete}
             />
           ) : null}
         </ScrollArea>
 
-        {/* Footer buttons */}
         <div className="flex justify-between gap-2 pt-2 border-t">
           {step !== 'progress' ? (
             <>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={step === 'type' ? handleClose : () => setStep(
-                  step === 'sources' ? 'type' : step === 'config' ? 'sources' : 'type'
-                )}
+                onClick={step === 'type' ? handleClose : () => setStep(prevStep())}
               >
                 {step === 'type' ? t('common.cancel') : t('common.back')}
               </Button>
@@ -402,8 +389,8 @@ export function GenerateArtifactDialog({
               {step === 'type' ? (
                 <Button
                   size="sm"
-                  disabled={!selectedType}
-                  onClick={handleNextFromType}
+                  disabled={!selectedArtifactType}
+                  onClick={() => setStep('sources')}
                 >
                   {t('common.next')}
                 </Button>
@@ -411,7 +398,7 @@ export function GenerateArtifactDialog({
                 <Button
                   size="sm"
                   disabled={!notebookId && !inlineContent.trim()}
-                  onClick={handleNextFromSources}
+                  onClick={() => setStep('config')}
                 >
                   {t('common.next')}
                 </Button>
@@ -433,12 +420,7 @@ export function GenerateArtifactDialog({
               ) : null}
             </>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={handleClose}
-            >
+            <Button variant="outline" size="sm" className="ml-auto" onClick={handleClose}>
               {t('common.done')}
             </Button>
           )}

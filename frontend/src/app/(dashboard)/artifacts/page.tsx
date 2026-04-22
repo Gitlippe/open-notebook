@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { ArtifactCard } from '@/components/artifacts/ArtifactCard'
 import { ArtifactPreview } from '@/components/artifacts/ArtifactPreview'
 import { GenerateArtifactDialog } from '@/components/artifacts/GenerateArtifactDialog'
-import { useArtifactsStore } from '@/lib/stores/artifacts-store'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import type { ArtifactJobResult } from '@/lib/types/artifacts'
 
@@ -16,30 +15,28 @@ const ARTIFACT_TYPE_COUNT = 14
 
 export default function ArtifactsPage() {
   const { t } = useTranslation()
-  const {
-    completedArtifacts,
-    isGenerateDialogOpen,
-    openGenerateDialog,
-    closeGenerateDialog,
-    setPreviewJobId,
-    addCompletedArtifact,
-  } = useArtifactsStore()
 
+  // Session-scoped artifact list (persisted in store on future PR)
+  const [completedArtifacts, setCompletedArtifacts] = useState<ArtifactJobResult[]>([])
+  const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [previewArtifact, setPreviewArtifact] = useState<ArtifactJobResult | null>(null)
 
   const handleOpenPreview = (artifact: ArtifactJobResult) => {
     setPreviewArtifact(artifact)
-    setPreviewJobId(artifact.job_id)
   }
 
   const handleClosePreview = () => {
     setPreviewArtifact(null)
-    setPreviewJobId(null)
   }
 
   const handleArtifactReady = (artifact: ArtifactJobResult) => {
-    // addCompletedArtifact is idempotent (checks by job_id)
-    addCompletedArtifact(artifact)
+    setCompletedArtifacts((prev) => {
+      // Deduplicate by generated_at + artifact_type (no job_id on result)
+      const isDuplicate = prev.some(
+        (a) => a.generated_at === artifact.generated_at && a.artifact_type === artifact.artifact_type
+      )
+      return isDuplicate ? prev : [artifact, ...prev]
+    })
   }
 
   return (
@@ -57,7 +54,7 @@ export default function ArtifactsPage() {
               </p>
             </div>
 
-            <Button onClick={openGenerateDialog} size="sm" className="gap-2 shrink-0">
+            <Button onClick={() => setIsGenerateDialogOpen(true)} size="sm" className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               {t('artifacts.newArtifact')}
             </Button>
@@ -65,7 +62,6 @@ export default function ArtifactsPage() {
 
           {/* Content */}
           {completedArtifacts.length === 0 ? (
-            /* Empty state */
             <div className="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-border py-16 text-center">
               <div className="rounded-full bg-muted p-4">
                 <Sparkles className="h-8 w-8 text-muted-foreground" />
@@ -79,17 +75,16 @@ export default function ArtifactsPage() {
                   )}
                 </p>
               </div>
-              <Button onClick={openGenerateDialog} size="sm" className="gap-2 mt-2">
+              <Button onClick={() => setIsGenerateDialogOpen(true)} size="sm" className="gap-2 mt-2">
                 <Plus className="h-4 w-4" />
                 {t('artifacts.newArtifact')}
               </Button>
             </div>
           ) : (
-            /* Artifact grid */
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {completedArtifacts.map((artifact) => (
+              {completedArtifacts.map((artifact, index) => (
                 <ArtifactCard
-                  key={artifact.job_id}
+                  key={`${artifact.artifact_type}-${artifact.generated_at}-${index}`}
                   artifact={artifact}
                   onOpenPreview={handleOpenPreview}
                 />
@@ -99,14 +94,12 @@ export default function ArtifactsPage() {
         </div>
       </div>
 
-      {/* Generate dialog */}
       <GenerateArtifactDialog
         open={isGenerateDialogOpen}
-        onClose={closeGenerateDialog}
+        onClose={() => setIsGenerateDialogOpen(false)}
         onArtifactReady={handleArtifactReady}
       />
 
-      {/* Preview modal */}
       <ArtifactPreview
         artifact={previewArtifact}
         open={Boolean(previewArtifact)}

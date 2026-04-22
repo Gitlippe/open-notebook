@@ -3,7 +3,7 @@
 import { formatDistanceToNow } from 'date-fns'
 import { Download, ExternalLink } from 'lucide-react'
 
-import { ArtifactJobResult } from '@/lib/types/artifacts'
+import { ArtifactJobResult, ArtifactFile } from '@/lib/types/artifacts'
 import { artifactsApi } from '@/lib/api/artifacts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,8 @@ function mimeLabel(mimeType: string): string {
 }
 
 interface ArtifactCardProps {
+  /** Stable session key for React (caller supplies, e.g. index or job_id) */
+  artifactKey?: string
   artifact: ArtifactJobResult
   onOpenPreview?: (artifact: ArtifactJobResult) => void
   className?: string
@@ -39,8 +41,8 @@ interface ArtifactCardProps {
 export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCardProps) {
   const { t, language } = useTranslation()
 
-  const distance = artifact.created_at
-    ? formatDistanceToNow(new Date(artifact.created_at), {
+  const distance = artifact.generated_at
+    ? formatDistanceToNow(new Date(artifact.generated_at), {
         addSuffix: true,
         locale: getDateLocale(language),
       })
@@ -74,7 +76,7 @@ export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCar
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-1 flex-1 min-w-0">
             <h3 className="text-sm font-semibold leading-tight text-foreground truncate">
-              {artifact.title ?? artifact.artifact_type}
+              {artifact.title ?? artifact.artifact_type ?? 'Artifact'}
             </h3>
             {distance ? (
               <p className="text-xs text-muted-foreground">
@@ -82,9 +84,11 @@ export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCar
               </p>
             ) : null}
           </div>
-          <Badge variant="secondary" className="shrink-0 text-xs capitalize">
-            {artifact.artifact_type.replace(/_/g, ' ')}
-          </Badge>
+          {artifact.artifact_type ? (
+            <Badge variant="secondary" className="shrink-0 text-xs capitalize">
+              {artifact.artifact_type.replace(/_/g, ' ')}
+            </Badge>
+          ) : null}
         </div>
 
         {/* Summary */}
@@ -98,10 +102,11 @@ export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCar
             className="flex flex-wrap gap-1.5"
             onClick={(e) => e.stopPropagation()}
           >
-            {artifact.files.map((file, index) => {
+            {artifact.files.map((file: ArtifactFile, index: number) => {
               const isPptx =
                 file.mime_type ===
                 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+              const href = artifactsApi.downloadUrl(file.path)
 
               return (
                 <div key={index} className="flex gap-1">
@@ -111,13 +116,9 @@ export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCar
                     size="sm"
                     className="h-7 text-xs gap-1"
                   >
-                    <a
-                      href={artifactsApi.downloadUrl(file.path)}
-                      download
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <a href={href} download onClick={(e) => e.stopPropagation()}>
                       <Download className="h-3 w-3" />
-                      {file.name ?? mimeLabel(file.mime_type)}
+                      {file.description ?? mimeLabel(file.mime_type)}
                     </a>
                   </Button>
                   {isPptx ? (
@@ -128,7 +129,7 @@ export function ArtifactCard({ artifact, onOpenPreview, className }: ArtifactCar
                       className="h-7 text-xs gap-1"
                     >
                       <a
-                        href={`ms-powerpoint:ofe|u|${artifactsApi.downloadUrl(file.path)}`}
+                        href={`ms-powerpoint:ofe|u|${href}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-3 w-3" />

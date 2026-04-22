@@ -54,9 +54,18 @@ export async function downloadArtifact(path: string): Promise<Blob> {
   return response.data
 }
 
+/**
+ * Build a relative download URL for an artifact file path suitable for
+ * use as an anchor href (routes through the Next.js /api proxy).
+ */
+export function artifactDownloadUrl(path: string): string {
+  return `/api/artifacts/download?path=${encodeURIComponent(path)}`
+}
+
 export const artifactsApi = {
   listArtifactTypes,
   submitGenerateJob,
   getArtifactJob,
   downloadArtifact,
+  downloadUrl: artifactDownloadUrl,
 }
