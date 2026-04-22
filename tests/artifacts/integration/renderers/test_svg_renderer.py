@@ -17,13 +17,18 @@ from pathlib import Path
 import pytest
 
 # Skip module-level if cairosvg cannot load cairo native lib
-cairosvg = pytest.importorskip("cairosvg", reason="cairosvg not available — skipping SVG renderer tests")
-
 try:
-    # Trigger the actual cairo dynamic library load (fails if libcairo absent)
+    import cairosvg
+    # Force the cairo dynamic library load — fails loudly if libcairo is
+    # absent (cairocffi/cairo raises OSError at import-time on some platforms
+    # and at call-time on others, so we do both).
     import cairosvg.surface  # noqa: F401
-except OSError as _cairo_err:
-    pytest.skip(f"libcairo native library not found: {_cairo_err}", allow_module_level=True)
+    cairosvg.svg2png(bytestring=b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>')
+except Exception as _cairo_err:  # noqa: BLE001
+    pytest.skip(
+        f"cairosvg / libcairo not loadable: {_cairo_err}",
+        allow_module_level=True,
+    )
 
 from PIL import Image
 
