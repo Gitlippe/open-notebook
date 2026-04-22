@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import asyncio
 
-from demos._common import demo_output_dir, offline_mode, print_result
+from demos._common import backend_label, demo_output_dir, print_result
 from open_notebook.artifacts import generate_artifact
+from open_notebook.artifacts.llm import _has_provider_configured
 
 
 SOURCE = {
@@ -47,6 +48,7 @@ be downloaded directly or served through the frontend.
 async def main():
     print("DEMO: podcast_integration — multi-artifact workflow")
     print("=" * 72)
+    print(f"Backend: {backend_label()}")
 
     results = []
     for kind, title in (
@@ -69,13 +71,13 @@ async def main():
         for f in r.files:
             print(f"  [{r.artifact_type:12}] {f.path}")
 
-    if offline_mode():
-        print("\n(Set ARTIFACT_USE_LLM=1 and configure a podcast-creator "
-              "provider to also trigger podcast generation.)")
-    else:
+    if _has_provider_configured():
         print("\n(Podcast generation is available via "
               "commands.podcast_commands.generate_podcast_command when the "
               "podcast-creator backend is configured.)")
+    else:
+        print("\n(Configure a provider key to also run podcast generation "
+              "via the existing podcast-creator integration.)")
 
 
 if __name__ == "__main__":

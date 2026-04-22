@@ -100,18 +100,21 @@ def test_mindmap_markdown_outline():
     assert "# Root" in out and "## L" in out and "- x" in out
 
 
-def test_pptx_deck_with_slides(tmp_path):
+def test_pptx_deck_with_typed_slides(tmp_path):
     data = {
         "title": "Deck",
         "subtitle": "sub",
         "slides": [
-            {"title": "A", "bullets": ["1"]},
-            {"title": "B", "bullets": ["2", "3"], "notes": "n"},
+            {"title": "Deck", "bullets": ["Opening"], "notes": "note", "slide_type": "title"},
+            {"title": "Agenda", "bullets": ["One", "Two"], "notes": "note", "slide_type": "agenda"},
+            {"title": "Details", "bullets": ["A", "B"], "notes": "note", "slide_type": "content"},
+            {"title": "82% gain", "bullets": ["Big number"], "notes": "note", "slide_type": "stat"},
+            {"title": "Thanks", "bullets": ["Q&A"], "notes": "note", "slide_type": "closing"},
         ],
     }
     out = render_deck(data, tmp_path / "d.pptx")
     assert out.exists()
-    assert out.stat().st_size > 4000
+    assert out.stat().st_size > 6000
 
 
 def test_pptx_deck_empty_slides(tmp_path):
@@ -159,34 +162,43 @@ def test_paper_figure_line(tmp_path):
 
 def test_infographic_png(tmp_path):
     data = {
-        "title": "I",
-        "subtitle": "sub",
-        "sections": [{"heading": "H", "text": "T"}],
-        "stats": [{"value": "1", "label": "x"}],
+        "title": "Infographic Title",
+        "subtitle": "Subtitle goes here",
+        "lede": "Lede sentence explaining the key point of the page.",
+        "sections": [{"heading": "H", "text": "T" * 60, "icon_hint": "chart"}],
+        "stats": [{"value": "1", "label": "x", "caveat": None}],
+        "takeaway": "Here is the takeaway line.",
         "color_theme": "blue",
     }
     out = render_infographic(data, tmp_path / "i.png")
     assert out.read_bytes()[:8].startswith(b"\x89PNG")
 
 
-def test_infographic_html(tmp_path):
+def test_infographic_html_includes_takeaway(tmp_path):
     data = {
         "title": "I",
         "subtitle": "sub",
-        "sections": [{"heading": "H", "text": "T"}],
+        "lede": "Lede line.",
+        "sections": [{"heading": "H", "text": "T", "icon_hint": "spark"}],
         "stats": [{"value": "1", "label": "x"}],
+        "takeaway": "Summary line.",
         "color_theme": "green",
     }
     out = render_infographic_html(data, tmp_path / "i.html")
-    assert "<h1>" in out.read_text()
+    html = out.read_text()
+    assert "<h1>" in html
+    assert "takeaway" in html
+    assert "Summary line." in html
 
 
 def test_infographic_theme_fallback(tmp_path):
     data = {
         "title": "I",
         "subtitle": "sub",
+        "lede": "Lede line.",
         "sections": [],
         "stats": [],
+        "takeaway": "t",
         "color_theme": "not-a-theme",
     }
     out = render_infographic(data, tmp_path / "i.png")
