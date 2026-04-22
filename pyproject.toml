@@ -62,6 +62,10 @@ dependencies = [
 [tool.setuptools]
 package-dir = {"open_notebook" = "open_notebook"}
 
+[tool.setuptools.package-data]
+"open_notebook.artifacts.assets.fonts" = ["*.ttf", "*.otf", "LICENSE.txt"]
+"open_notebook.artifacts.assets.templates" = ["*.j2", "*.svg", "*.html"]
+
 
 [project.optional-dependencies]
 dev = [
