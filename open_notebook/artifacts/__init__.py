@@ -1,30 +1,26 @@
 """Artifact generation package for Open Notebook.
 
-Provides a modular, pluggable system for generating multiple artifact types
-from research sources: briefings (BLUF summaries), study guides, FAQs,
-research reviews, flashcards, quizzes, mind maps, timelines, infographics,
-slide decks, pitch decks, and paper figures.
-
-Each artifact is a subclass of :class:`BaseArtifactGenerator` that consumes
-an :class:`ArtifactRequest` and produces an :class:`ArtifactResult`.
-
-High-level API::
-
-    from open_notebook.artifacts import generate_artifact
-
-    result = await generate_artifact(
-        artifact_type="briefing",
-        sources=[{"title": "...", "content": "..."}],
-        config={"audience": "executive"},
-        output_dir="/tmp/out",
-    )
+SOTA pipeline: plan → claim extraction → structured draft → self-critique →
+refinement → format-specific rendering. Every generator uses the same
+structured-output LLM protocol; offline runs use a mock backend that
+implements the identical protocol rather than bypassing the workflow.
 """
 from open_notebook.artifacts.base import (
+    ArtifactFile,
     ArtifactRequest,
     ArtifactResult,
     ArtifactSource,
     BaseArtifactGenerator,
 )
+from open_notebook.artifacts.llm import (
+    ArtifactLLM,
+    ArtifactLLMError,
+    DEFAULT_ARTIFACT_LLM,
+    LangChainChat,
+    StructuredChat,
+    use_artifact_llm,
+)
+from open_notebook.artifacts.mock_llm import StructuredMockChat
 from open_notebook.artifacts.registry import (
     ARTIFACT_TYPES,
     generate_artifact,
@@ -34,13 +30,21 @@ from open_notebook.artifacts.registry import (
 )
 
 __all__ = [
+    "ARTIFACT_TYPES",
+    "ArtifactFile",
+    "ArtifactLLM",
+    "ArtifactLLMError",
     "ArtifactRequest",
     "ArtifactResult",
     "ArtifactSource",
-    "ARTIFACT_TYPES",
     "BaseArtifactGenerator",
+    "DEFAULT_ARTIFACT_LLM",
+    "LangChainChat",
+    "StructuredChat",
+    "StructuredMockChat",
     "generate_artifact",
     "get_generator",
     "list_artifact_types",
     "register_generator",
+    "use_artifact_llm",
 ]
