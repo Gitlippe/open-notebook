@@ -1,6 +1,10 @@
 """HTTP endpoints for artifact generation.
 
-Exposes the twelve built-in artifact generators and their metadata.
+Mirrors the podcast async pattern:
+- POST /artifacts/generate submits a surreal-commands job and returns {job_id}.
+- GET /artifacts/jobs/{job_id} polls status.
+- GET /artifacts/download streams a generated file (path-traversal guarded).
+- GET /artifacts/types lists every registered generator.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from api import artifact_service
+from open_notebook.config import ARTIFACT_OUTPUT_ROOT
 
 router = APIRouter()
 
@@ -35,69 +40,80 @@ class ArtifactGenerateRequest(BaseModel):
     output_dir: Optional[str] = None
 
 
+class ArtifactJobSubmitted(BaseModel):
+    job_id: str
+    status: str = "submitted"
+
+
 class ArtifactFileOut(BaseModel):
     path: str
     mime_type: str
     description: Optional[str] = None
 
 
-class ArtifactGenerateResponse(BaseModel):
-    artifact_type: str
-    title: str
+class ArtifactJobResult(BaseModel):
+    """Shape returned by GET /artifacts/jobs/{id} when complete."""
+
+    status: str
+    artifact_type: Optional[str] = None
+    title: Optional[str] = None
     summary: Optional[str] = None
-    structured: Dict[str, Any]
-    files: List[ArtifactFileOut]
-    metadata: Dict[str, Any]
-    generated_at: str
+    structured: Dict[str, Any] = Field(default_factory=dict)
+    files: List[ArtifactFileOut] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    provenance: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    generated_at: Optional[str] = None
 
 
 @router.get("/artifacts/types")
 async def list_types() -> Dict[str, Any]:
+    """Return the registered artifact types and their descriptions."""
     return {"types": artifact_service.available_types()}
 
 
-@router.post("/artifacts/generate", response_model=ArtifactGenerateResponse)
-async def generate(request: ArtifactGenerateRequest) -> ArtifactGenerateResponse:
-    try:
-        result = await artifact_service.generate(
-            artifact_type=request.artifact_type,
-            sources=[s.model_dump() for s in request.sources],
-            notebook_id=request.notebook_id,
-            title=request.title,
-            config=request.config,
-            model_id=request.model_id,
-            output_dir=request.output_dir,
-        )
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+@router.post("/artifacts/generate", response_model=ArtifactJobSubmitted)
+async def generate(request: ArtifactGenerateRequest) -> ArtifactJobSubmitted:
+    """Submit an artifact-generation job to the surreal-commands queue.
 
-    return ArtifactGenerateResponse(
-        artifact_type=result.artifact_type,
-        title=result.title,
-        summary=result.summary,
-        structured=result.structured,
-        files=[
-            ArtifactFileOut(
-                path=f.path, mime_type=f.mime_type, description=f.description
-            )
-            for f in result.files
-        ],
-        metadata=result.metadata,
-        generated_at=result.generated_at,
+    The job runs asynchronously; poll GET /artifacts/jobs/{job_id}.
+    """
+    job_id = await artifact_service.submit_generation_job(
+        artifact_type=request.artifact_type,
+        sources=[s.model_dump() for s in request.sources],
+        notebook_id=request.notebook_id,
+        title=request.title,
+        config=request.config,
+        model_id=request.model_id,
+        output_dir=request.output_dir,
     )
+    return ArtifactJobSubmitted(job_id=job_id, status="submitted")
+
+
+@router.get("/artifacts/jobs/{job_id}", response_model=ArtifactJobResult)
+async def get_job(job_id: str) -> ArtifactJobResult:
+    """Return the current status + payload of an artifact generation job."""
+    return await artifact_service.get_job_status(job_id)
 
 
 @router.get("/artifacts/download")
-async def download(path: str):
-    """Return an artifact file by absolute path.
+async def download(path: str) -> FileResponse:
+    """Return a generated artifact file.
 
-    The path must point to a file that already exists on disk. This is
-    intentionally simple because artifacts are generated locally; in a
-    hardened deployment you would restrict this to a known artifacts root.
+    Path-traversal guarded: the resolved path must sit inside
+    ``ARTIFACT_OUTPUT_ROOT`` (see ``open_notebook/config.py``).
     """
-    p = Path(path)
-    if not p.exists() or not p.is_file():
+    root = Path(ARTIFACT_OUTPUT_ROOT).resolve()
+    try:
+        p = Path(path).resolve(strict=True)
+    except (FileNotFoundError, RuntimeError):
         raise HTTPException(status_code=404, detail="File not found")
+
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        p.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path is outside artifact root")
+
     return FileResponse(str(p), filename=p.name)

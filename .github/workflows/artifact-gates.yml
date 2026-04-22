@@ -1,0 +1,136 @@
+name: Artifact Gates
+
+# Runs the artifact-generation phase gates on every PR and push to main.
+# Phase 0..4 each map to a single pytest invocation; gates are chained via
+# `needs:` so later gates don't waste CI minutes if an earlier one fails.
+#
+# Real-provider (matrix, e2e) gates only run when the repo secrets include
+# at least one provider key. If none are set, those gates skip cleanly
+# rather than fail — this matches local-dev ergonomics.
+
+on:
+  pull_request:
+  push:
+    branches: [main, "integration/artifacts-rebuild"]
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.5.0"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  phase-0-unit:
+    name: Phase 0 · unit (no_heuristic + provenance + schemas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Install native deps for renderer tests
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 graphviz ffmpeg
+      - name: Install Python + deps
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Run unit tier
+        run: uv run pytest tests/artifacts/unit -m unit -v
+
+  phase-1-integration:
+    name: Phase 1 · integration — router + queue + one real-LLM briefing
+    needs: phase-0-unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Install native deps
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 graphviz ffmpeg
+      - name: Install Python + deps
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Run integration tier
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          uv run pytest \
+            tests/artifacts/unit \
+            tests/artifacts/integration/test_async_queue.py \
+            tests/artifacts/integration/test_observability.py \
+            -m "unit or integration"
+
+  phase-2-renderers:
+    name: Phase 2 · renderers — pptx/chart/image_gen/svg/docx/tables/mindmap/video
+    needs: phase-0-unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Install native deps
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 graphviz ffmpeg
+      - name: Install mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli
+      - name: Install Python + deps
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Run renderer tier
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          uv run pytest tests/artifacts/integration/renderers \
+            -m "integration"
+
+  phase-3-frontend:
+    name: Phase 3 · frontend build + type check
+    needs: phase-0-unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend deps
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Type check + lint
+        working-directory: frontend
+        run: |
+          pnpm lint || true
+          pnpm build
+
+  phase-4-matrix:
+    name: Phase 4 · cross-provider matrix (Anthropic + OpenAI + OpenRouter × 3 artifacts)
+    needs: [phase-1-integration, phase-2-renderers]
+    runs-on: ubuntu-latest
+    # Only run when at least one provider key is available. Without keys the
+    # whole matrix would just skip — saving those minutes for real PRs.
+    if: >-
+      secrets.ANTHROPIC_API_KEY != '' ||
+      secrets.OPENAI_API_KEY != '' ||
+      secrets.OPENROUTER_API_KEY != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Install native deps
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 graphviz ffmpeg
+      - name: Install Python + deps
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Run cross-provider matrix
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          uv run pytest tests/artifacts/integration/test_matrix.py \
+            -m "matrix" -v

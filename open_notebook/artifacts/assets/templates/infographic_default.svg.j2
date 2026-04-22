@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+{#
+  Open Notebook — Infographic SVG template
+  Variables (passed from svg_renderer.render):
+    title        str
+    subtitle     str | None
+    sections     list[{heading: str, text: str}]
+    stats        list[{value: str, label: str}]
+    color_theme  "blue" | "green" | "orange" | "mono"
+
+  Canvas: 1200 × 1800 px (portrait, 72 dpi suitable — scale to 144dpi via cairosvg)
+#}
+
+{# ── Color themes ──────────────────────────────────────────── #}
+{% set themes = {
+  "blue":   {"bg": "#0f172a", "panel": "#1e293b", "panel2": "#162032",
+             "accent": "#38bdf8", "accent2": "#0ea5e9",
+             "text": "#f1f5f9", "muted": "#94a3b8", "divider": "#334155"},
+  "green":  {"bg": "#052e16", "panel": "#064e3b", "panel2": "#073d2e",
+             "accent": "#4ade80", "accent2": "#22c55e",
+             "text": "#ecfdf5", "muted": "#86efac", "divider": "#166534"},
+  "orange": {"bg": "#431407", "panel": "#7c2d12", "panel2": "#6b2510",
+             "accent": "#fb923c", "accent2": "#f97316",
+             "text": "#fff7ed", "muted": "#fdba74", "divider": "#9a3412"},
+  "mono":   {"bg": "#111827", "panel": "#1f2937", "panel2": "#18202c",
+             "accent": "#e5e7eb", "accent2": "#d1d5db",
+             "text": "#f9fafb", "muted": "#9ca3af", "divider": "#374151"},
+} %}
+{% set t = themes.get(color_theme, themes["blue"]) %}
+
+{# ── Layout constants ─────────────────────────────────────── #}
+{% set W = 1200 %}
+{% set H = 1800 %}
+{% set PAD = 60 %}
+{% set INNER_W = W - 2 * PAD %}
+
+{# Stats panel ─────────────────────────────────────────────── #}
+{% set STATS_TOP = 260 %}
+{% set STATS_H = 180 %}
+{% set STAT_COLS = [stats|length, 4]|min %}
+{% set STAT_W = INNER_W // STAT_COLS %}
+
+{# Sections starting Y ─────────────────────────────────────── #}
+{% set SECT_TOP = STATS_TOP + STATS_H + 48 %}
+{% set MAX_SECTIONS = [sections|length, 6]|min %}
+{% set SECT_H = (H - SECT_TOP - PAD - 48) // MAX_SECTIONS %}
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="{{ W }}" height="{{ H }}"
+     viewBox="0 0 {{ W }} {{ H }}"
+     font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{{ t.bg }}" />
+      <stop offset="100%" stop-color="{{ t.panel }}" />
+    </linearGradient>
+
+    <!-- Accent gradient for title bar -->
+    <linearGradient id="accent_grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="{{ t.accent }}" />
+      <stop offset="100%" stop-color="{{ t.accent2 }}" />
+    </linearGradient>
+
+    <!-- Panel gradient -->
+    <linearGradient id="panel_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{{ t.panel }}" />
+      <stop offset="100%" stop-color="{{ t.panel2 }}" />
+    </linearGradient>
+
+    <!-- Stat value gradient -->
+    <linearGradient id="stat_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{{ t.accent }}" />
+      <stop offset="100%" stop-color="{{ t.accent2 }}" stop-opacity="0.85" />
+    </linearGradient>
+
+    <!-- Drop shadow for panels -->
+    <filter id="panel_shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="{{ t.bg }}" flood-opacity="0.6" />
+    </filter>
+
+    <!-- Glow filter for section icons -->
+    <filter id="icon_glow">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Clip path for rounded stat blocks -->
+    <clipPath id="stat_clip">
+      <rect x="{{ PAD }}" y="{{ STATS_TOP }}" width="{{ INNER_W }}" height="{{ STATS_H }}" rx="16" ry="16" />
+    </clipPath>
+  </defs>
+
+  <!-- ══ BACKGROUND ═══════════════════════════════════════════ -->
+  <rect width="{{ W }}" height="{{ H }}" fill="url(#bg_grad)" />
+
+  <!-- Subtle grid overlay -->
+  <g opacity="0.03">
+    {% for x in range(0, W + 60, 60) %}
+    <line x1="{{ x }}" y1="0" x2="{{ x }}" y2="{{ H }}" stroke="{{ t.accent }}" stroke-width="1"/>
+    {% endfor %}
+    {% for y in range(0, H + 60, 60) %}
+    <line x1="0" y1="{{ y }}" x2="{{ W }}" y2="{{ y }}" stroke="{{ t.accent }}" stroke-width="1"/>
+    {% endfor %}
+  </g>
+
+  <!-- Corner decoration -->
+  <circle cx="{{ W }}" cy="0" r="300" fill="{{ t.accent }}" opacity="0.04" />
+  <circle cx="0" cy="{{ H }}" r="200" fill="{{ t.accent2 }}" opacity="0.04" />
+
+  <!-- ══ HEADER BAND ════════════════════════════════════════════ -->
+  <!-- Accent bar — full width at top -->
+  <rect x="0" y="0" width="{{ W }}" height="8" fill="url(#accent_grad)" />
+
+  <!-- Title block -->
+  <rect x="{{ PAD }}" y="36" width="{{ INNER_W }}" height="200" rx="12" fill="{{ t.panel }}" opacity="0.6" filter="url(#panel_shadow)" />
+
+  <!-- Title text -->
+  <text x="{{ PAD + 28 }}" y="100"
+        font-size="52" font-weight="700" fill="{{ t.accent }}"
+        letter-spacing="-0.5">
+    {{ title | e | truncate(42, True, '…') }}
+  </text>
+
+  <!-- Subtitle -->
+  {% if subtitle %}
+  <text x="{{ PAD + 28 }}" y="148"
+        font-size="22" font-weight="400" fill="{{ t.muted }}"
+        letter-spacing="0.1">
+    {{ subtitle | e | truncate(78, True, '…') }}
+  </text>
+  {% endif %}
+
+  <!-- Divider line with gradient -->
+  <line x1="{{ PAD }}" y1="220" x2="{{ W - PAD }}" y2="220"
+        stroke="url(#accent_grad)" stroke-width="3" stroke-linecap="round" />
+
+  <!-- ══ STATS BAND ══════════════════════════════════════════ -->
+  <!-- Stats container -->
+  <rect x="{{ PAD }}" y="{{ STATS_TOP }}"
+        width="{{ INNER_W }}" height="{{ STATS_H }}"
+        rx="16" fill="url(#panel_grad)" filter="url(#panel_shadow)" />
+
+  {% for stat in stats[:4] %}
+  {% set sx = PAD + loop.index0 * STAT_W %}
+  {% set cx = sx + STAT_W // 2 %}
+
+  <!-- Stat vertical divider (not after last) -->
+  {% if not loop.last %}
+  <line x1="{{ sx + STAT_W }}" y1="{{ STATS_TOP + 24 }}"
+        x2="{{ sx + STAT_W }}" y2="{{ STATS_TOP + STATS_H - 24 }}"
+        stroke="{{ t.divider }}" stroke-width="1" />
+  {% endif %}
+
+  <!-- Stat value -->
+  <text x="{{ cx }}" y="{{ STATS_TOP + 88 }}"
+        font-size="52" font-weight="700" fill="url(#stat_grad)"
+        text-anchor="middle" dominant-baseline="auto"
+        letter-spacing="-1">
+    {{ stat.value | e | truncate(10, True, '') }}
+  </text>
+
+  <!-- Stat label -->
+  <text x="{{ cx }}" y="{{ STATS_TOP + 138 }}"
+        font-size="18" font-weight="400" fill="{{ t.muted }}"
+        text-anchor="middle">
+    {{ stat.label | e | truncate(28, True, '…') }}
+  </text>
+  {% endfor %}
+
+  <!-- ══ CONTENT SECTIONS ════════════════════════════════════ -->
+  {% for section in sections[:6] %}
+  {% set sy = SECT_TOP + loop.index0 * SECT_H %}
+  {% set BODY_H = SECT_H - 20 %}
+
+  <!-- Section card -->
+  <rect x="{{ PAD }}" y="{{ sy }}"
+        width="{{ INNER_W }}" height="{{ BODY_H }}"
+        rx="12" fill="{{ t.panel }}" opacity="0.7" />
+
+  <!-- Section accent left bar -->
+  <rect x="{{ PAD }}" y="{{ sy }}" width="5" height="{{ BODY_H }}" rx="2"
+        fill="{{ t.accent }}" opacity="0.9" />
+
+  <!-- Section number badge -->
+  <circle cx="{{ PAD + 38 }}" cy="{{ sy + 36 }}" r="18"
+          fill="{{ t.accent }}" opacity="0.15" />
+  <text x="{{ PAD + 38 }}" y="{{ sy + 42 }}"
+        font-size="16" font-weight="700" fill="{{ t.accent }}"
+        text-anchor="middle">
+    {{ loop.index }}
+  </text>
+
+  <!-- Section heading -->
+  <text x="{{ PAD + 68 }}" y="{{ sy + 42 }}"
+        font-size="24" font-weight="600" fill="{{ t.accent }}"
+        letter-spacing="0.2">
+    {{ section.heading | e | truncate(52, True, '…') }}
+  </text>
+
+  <!-- Divider under heading -->
+  <line x1="{{ PAD + 12 }}" y1="{{ sy + 58 }}"
+        x2="{{ W - PAD - 12 }}" y2="{{ sy + 58 }}"
+        stroke="{{ t.divider }}" stroke-width="1" />
+
+  <!-- Section body text — word-wrap via tspan rows -->
+  {# Split text into ~88-char lines for the SVG canvas width #}
+  {% set body = section.text | e %}
+  {% set words = body.split() %}
+  {% set ns = namespace(line='', lines=[], col=0) %}
+  {% for word in words %}
+    {% set candidate = (ns.line + ' ' + word).strip() %}
+    {% if candidate | length > 88 %}
+      {% set ns.lines = ns.lines + [ns.line] %}
+      {% set ns.line = word %}
+    {% else %}
+      {% set ns.line = candidate %}
+    {% endif %}
+  {% endfor %}
+  {% if ns.line %}{% set ns.lines = ns.lines + [ns.line] %}{% endif %}
+
+  <text x="{{ PAD + 20 }}" y="{{ sy + 84 }}"
+        font-size="19" font-weight="400" fill="{{ t.text }}"
+        line-height="1.5">
+    {% for ln in ns.lines[:3] %}
+    <tspan x="{{ PAD + 20 }}" dy="{{ '0' if loop.first else '28' }}">{{ ln }}</tspan>
+    {% endfor %}
+  </text>
+  {% endfor %}
+
+  <!-- ══ FOOTER ════════════════════════════════════════════ -->
+  <line x1="{{ PAD }}" y1="{{ H - 52 }}"
+        x2="{{ W - PAD }}" y2="{{ H - 52 }}"
+        stroke="{{ t.divider }}" stroke-width="1" />
+
+  <!-- Open Notebook branding -->
+  <text x="{{ PAD }}" y="{{ H - 24 }}"
+        font-size="14" fill="{{ t.muted }}" opacity="0.7">
+    Generated by Open Notebook
+  </text>
+
+  <!-- Theme badge -->
+  <rect x="{{ W - PAD - 90 }}" y="{{ H - 44 }}" width="90" height="24"
+        rx="12" fill="{{ t.accent }}" opacity="0.15" />
+  <text x="{{ W - PAD - 45 }}" y="{{ H - 27 }}"
+        font-size="12" fill="{{ t.accent }}" text-anchor="middle"
+        font-weight="600" letter-spacing="0.5">
+    {{ color_theme | upper }}
+  </text>
+
+</svg>

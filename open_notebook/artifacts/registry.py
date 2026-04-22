@@ -81,21 +81,35 @@ async def generate_artifact(
 
 
 def _autoregister() -> None:
-    """Import built-in generators to populate the registry."""
+    """Import built-in generators to populate the registry.
+
+    Two sentinel regions — one per workstream — prevent merge conflicts
+    when parallel agents add generators. Stream B owns BATCH_B, Stream C
+    owns BATCH_C. Alphabetise within each region.
+    """
+    # <BATCH B>
     from open_notebook.artifacts.generators import (  # noqa: F401
         briefing,
         faq,
         flashcards,
-        infographic,
         mindmap,
-        paper_figure,
-        pitch_deck,
         quiz,
-        research_review,
-        slide_deck,
         study_guide,
         timeline,
     )
+    # </BATCH B>
+
+    # <BATCH C>
+    from open_notebook.artifacts.generators import (  # noqa: F401
+        data_tables,
+        infographic,
+        paper_figure,
+        pitch_deck,
+        research_review,
+        slide_deck,
+        video_overview,
+    )
+    # </BATCH C>
 
 
 _autoregister()
