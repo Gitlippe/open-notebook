@@ -19,6 +19,7 @@ Coordination notes for Stream G:
 from __future__ import annotations
 
 import json
+import os
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -203,15 +204,46 @@ class VideoOverviewGenerator(BaseArtifactGenerator):
         md_path = self.output_path(request, "md")
         md_path.write_text(_render_markdown_script(result), encoding="utf-8")
 
-        # TODO (Phase 2 Stream G): add video_renderer.py that reads beats.json and:
-        #   1. Calls image_gen.py per beat (visual_prompt → PIL image)
-        #   2. Calls TTS provider per beat (narration_script → audio file)
-        #   3. Stitches via ffmpeg → MP4 at output_path(request, "mp4")
-        #   4. Appends ArtifactFile(path=..., mime_type="video/mp4") to result.files
-
         total_words = sum(
             len(b.narration_script.split()) for b in result.beats
         )
+
+        artifact_files = [
+            ArtifactFile(
+                path=str(json_path),
+                mime_type="application/json",
+                description="beats.json — video spec for Phase 2 Stream G renderer",
+            ),
+            ArtifactFile(
+                path=str(md_path),
+                mime_type="text/markdown",
+                description="Narration script preview (Markdown)",
+            ),
+        ]
+        mp4_rendered = False
+
+        # Phase 2 Stream G wiring: call the video renderer when requested.
+        # Set ARTIFACT_RENDER_VIDEO=1 to trigger full render (TTS + image gen + ffmpeg).
+        # Requires Stream D (image_gen.py) to be merged first.
+        if os.environ.get("ARTIFACT_RENDER_VIDEO", "").strip() == "1":
+            from open_notebook.artifacts.renderers.video_renderer import render_video
+            mp4_path = self.output_path(request, "mp4")
+            try:
+                await render_video(result, mp4_path)
+                artifact_files.append(
+                    ArtifactFile(
+                        path=str(mp4_path),
+                        mime_type="video/mp4",
+                        description="Rendered video (MP4 H.264 + AAC, 1080p 30fps)",
+                    )
+                )
+                mp4_rendered = True
+            except Exception as render_err:
+                # Log but do not fail the artifact generation; the spec files are still valid.
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    f"Stream G render_video failed (beats.json still written): {render_err}"
+                )
 
         return ArtifactResult(
             artifact_type=self.artifact_type,
@@ -220,20 +252,10 @@ class VideoOverviewGenerator(BaseArtifactGenerator):
                 f"{len(result.beats)}-beat video spec, "
                 f"~{result.total_duration_seconds}s, "
                 f"~{total_words} narration words"
+                + (" (MP4 rendered)" if mp4_rendered else "")
             ),
             structured=data,
-            files=[
-                ArtifactFile(
-                    path=str(json_path),
-                    mime_type="application/json",
-                    description="beats.json — video spec for Phase 2 Stream G renderer",
-                ),
-                ArtifactFile(
-                    path=str(md_path),
-                    mime_type="text/markdown",
-                    description="Narration script preview (Markdown)",
-                ),
-            ],
+            files=artifact_files,
             provenance=self.llm.provenance,
             metadata={
                 "beat_count": len(result.beats),
@@ -241,6 +263,6 @@ class VideoOverviewGenerator(BaseArtifactGenerator):
                 "voice_provider": result.voice.provider,
                 "voice_id": result.voice.voice_id,
                 "total_narration_words": total_words,
-                "phase2_renderer": "TODO: Stream G",
+                "mp4_rendered": mp4_rendered,
             },
         )
