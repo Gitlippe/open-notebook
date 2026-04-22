@@ -44,6 +44,7 @@ async def generate_artifact(
     model_id: Optional[str] = None,
     output_dir: Optional[str] = None,
     llm=None,
+    use_mock_if_unavailable: bool = True,
 ) -> ArtifactResult:
     """Convenience one-shot generator.
 
@@ -76,6 +77,17 @@ async def generate_artifact(
         model_id=model_id,
         output_dir=output_dir,
     )
+
+    # LLM resolution: if caller did not pass one and no provider is
+    # configured, auto-wire a StructuredMockChat-backed ArtifactLLM so the
+    # multi-step pipeline still runs end-to-end. This keeps the offline
+    # code path identical to production (same schemas, same critique loop).
+    if llm is None and use_mock_if_unavailable:
+        from open_notebook.artifacts.llm import ArtifactLLM, _has_provider_configured
+        from open_notebook.artifacts.mock_llm import StructuredMockChat
+        if not _has_provider_configured():
+            llm = ArtifactLLM(chat=StructuredMockChat())
+
     generator = get_generator(artifact_type, llm=llm)
     return await generator.generate(request)
 
