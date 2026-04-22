@@ -619,3 +619,276 @@ def build_timeline_prompt() -> str:
 
 
 # </BATCH B>
+
+# ---------------------------------------------------------------------------
+# <BATCH C> Stream C map/reduce prompts (alphabetical within batch).
+# Owners: slide_deck, pitch_deck, research_review, paper_figure, infographic,
+#         video_overview, data_tables.
+# ---------------------------------------------------------------------------
+
+DATA_TABLES_MAP_PROMPT = """Extract all tabular data, comparisons, metrics, and
+structured lists from this source chunk. Return STRICT JSON:
+{
+  "tables": [
+    {
+      "title": "descriptive table title",
+      "columns": ["Column 1", "Column 2", "Column 3"],
+      "rows": [
+        ["value 1a", "value 1b", "value 1c"],
+        ["value 2a", "value 2b", "value 2c"]
+      ],
+      "caption": "optional footnote or source attribution, or null"
+    }
+  ]
+}
+Include at least 1 table. Produce one table per distinct dataset found.
+Preserve numeric types in rows where possible.
+If no tabular data is present, create one table with key facts: columns ["Attribute", "Value"].
+No commentary outside JSON."""
+
+DATA_TABLES_REDUCE_PROMPT = """Synthesise tabular data extracted from multiple source
+chunks into a clean, deduplicated collection of tables.
+Return STRICT JSON:
+{
+  "tables": [
+    {
+      "title": "descriptive table title",
+      "columns": ["Column 1", "Column 2"],
+      "rows": [
+        ["value 1a", "value 1b"],
+        ["value 2a", "value 2b"]
+      ],
+      "caption": "optional footnote or source attribution, or null"
+    }
+  ]
+}
+Merge tables that cover the same topic into one. Remove duplicate rows.
+Ensure every row has the same number of cells as the columns list.
+No commentary outside JSON."""
+
+INFOGRAPHIC_MAP_PROMPT = """Extract key facts, statistics, and narrative points from
+this source chunk for use in a single-page infographic.
+Return STRICT JSON:
+{
+  "title": "bold, short headline",
+  "subtitle": "one-sentence hook",
+  "sections": [{"heading": "section title", "text": "1-2 sentence narrative"}],
+  "stats": [{"value": "e.g. 82%", "label": "short label"}],
+  "color_theme": "blue"
+}
+Produce 2-3 sections and 2-3 stats. color_theme must be one of: blue, green, orange, mono.
+No commentary outside JSON."""
+
+INFOGRAPHIC_REDUCE_PROMPT = """Synthesise partial infographic specs from multiple
+source chunks into one polished, single-page infographic layout.
+Return STRICT JSON:
+{
+  "title": "bold, short headline",
+  "subtitle": "one-sentence hook",
+  "sections": [{"heading": "section title", "text": "1-2 sentence narrative"}],
+  "stats": [{"value": "e.g. 82%", "label": "short label"}],
+  "color_theme": "blue"
+}
+Produce 3-5 sections and 3-4 stats. Remove redundancy.
+color_theme must be one of: blue, green, orange, mono.
+No commentary outside JSON."""
+
+PAPER_FIGURE_MAP_PROMPT = """Extract quantitative data and key findings from this
+source chunk suitable for visualisation in a research paper figure.
+Return STRICT JSON:
+{
+  "title": "figure title",
+  "chart_type": "bar",
+  "x_label": "x axis label",
+  "y_label": "y axis label",
+  "series": [
+    {
+      "name": "series name",
+      "data": [{"x": "category or value", "y": 0.0}]
+    }
+  ],
+  "caption": "1-2 sentence figure caption"
+}
+chart_type must be one of: bar, line, scatter.
+If no numeric data is available, use reasonable inferred values and note it in caption.
+No commentary outside JSON."""
+
+PAPER_FIGURE_REDUCE_PROMPT = """Synthesise data extracted from multiple source chunks
+into one clean, publication-ready figure specification.
+Return STRICT JSON:
+{
+  "title": "figure title",
+  "chart_type": "bar",
+  "x_label": "x axis label",
+  "y_label": "y axis label",
+  "series": [
+    {
+      "name": "series name",
+      "data": [{"x": "category or value", "y": 0.0}]
+    }
+  ],
+  "caption": "1-2 sentence figure caption"
+}
+chart_type must be one of: bar, line, scatter. Select the most informative data.
+No commentary outside JSON."""
+
+PITCH_DECK_MAP_PROMPT = """Extract key content from this source chunk that would be
+relevant for an investor pitch deck. Return STRICT JSON:
+{
+  "title": "deck title",
+  "tagline": "one-line positioning",
+  "slides": [
+    {
+      "title": "slide title",
+      "bullets": ["bullet 1", "bullet 2"],
+      "notes": "speaker notes"
+    }
+  ]
+}
+Produce 3-5 slides. Focus on facts, metrics, and claims relevant for investors.
+No commentary outside JSON."""
+
+PITCH_DECK_REDUCE_PROMPT = """Synthesise partial pitch deck extractions from multiple
+source chunks into one coherent venture-style pitch deck.
+Use the canonical structure: Cover, Problem, Solution, Market, Product,
+Business Model, Traction, Competition, Team, Financials, Ask.
+Return STRICT JSON:
+{
+  "title": "deck title",
+  "tagline": "one-line positioning",
+  "slides": [
+    {
+      "title": "slide title",
+      "bullets": ["..."],
+      "notes": "presenter notes"
+    }
+  ]
+}
+Produce 8-12 slides. Remove redundancy. No commentary outside JSON."""
+
+RESEARCH_REVIEW_MAP_PROMPT = """You are a skeptical practitioner reviewing a research
+paper chunk. Extract relevant review points. Return STRICT JSON:
+{
+  "title": "Review: <topic>",
+  "bluf": "one-sentence verdict on this chunk",
+  "notable_authors": [],
+  "affiliations": [],
+  "short_take": "2-4 sentence summary",
+  "why_we_care": {
+    "direct_techniques": [],
+    "cost_effectiveness": [],
+    "limitations": []
+  },
+  "limitations": ["methodological limitations found"],
+  "potential_applications": ["concrete use cases"],
+  "resources": [{"label": "...", "url": "..."}]
+}
+No commentary outside JSON."""
+
+RESEARCH_REVIEW_REDUCE_PROMPT = """Synthesise partial research review extractions into
+one coherent, skeptical peer review. Consolidate findings, remove duplicates.
+Return STRICT JSON:
+{
+  "title": "Research Review: <paper/topic title>",
+  "bluf": "Bottom Line Up Front. Clear verdict.",
+  "notable_authors": ["Author One", "Author Two"],
+  "affiliations": ["Affiliation 1"],
+  "short_take": "3-6 sentence summary in plain language",
+  "why_we_care": {
+    "direct_techniques": ["concrete techniques we could adopt"],
+    "cost_effectiveness": ["cost/ROI considerations"],
+    "limitations": ["critical flaws or open questions"]
+  },
+  "limitations": ["explicit methodological limitations"],
+  "potential_applications": ["2-5 concrete internal use cases"],
+  "resources": [{"label": "arXiv", "url": "..."}]
+}
+No commentary outside JSON."""
+
+SLIDE_DECK_MAP_PROMPT = """Extract key informational content from the following source
+chunk to contribute to a slide deck. Return STRICT JSON:
+{
+  "title": "deck title (infer from content if not explicit)",
+  "subtitle": "one-line subtitle or null",
+  "slides": [
+    {
+      "title": "slide title",
+      "bullets": ["bullet 1", "bullet 2", "bullet 3"],
+      "notes": "presenter speaker notes"
+    }
+  ]
+}
+Produce 3-5 slides representing the most important points in this chunk.
+No commentary outside JSON."""
+
+SLIDE_DECK_REDUCE_PROMPT = """Synthesise partial slide deck extractions from multiple
+source chunks into one coherent, non-redundant deck.
+Return STRICT JSON:
+{
+  "title": "deck title",
+  "subtitle": "short subtitle",
+  "slides": [
+    {
+      "title": "slide title",
+      "bullets": ["bullet 1", "bullet 2", "bullet 3"],
+      "notes": "presenter speaker notes"
+    }
+  ]
+}
+Include 7-10 slides total. Remove duplicate or near-duplicate points.
+Ensure logical narrative flow: title -> body slides -> conclusion.
+No commentary outside JSON."""
+
+VIDEO_OVERVIEW_MAP_PROMPT = """Extract key narrative moments from this source chunk
+to contribute to a narrated video overview. Return STRICT JSON:
+{
+  "title": "video title",
+  "total_duration_seconds": 60,
+  "voice": {
+    "provider": "openai",
+    "voice_id": "alloy",
+    "speaking_rate": 1.0
+  },
+  "beats": [
+    {
+      "beat_index": 1,
+      "duration_seconds": 20,
+      "narration_script": "Full, verbatim spoken narration. Conversational, reads naturally aloud.",
+      "visual_prompt": "Specific image generation prompt: composition, style, colors, key elements.",
+      "alt_text": "One-sentence accessibility description of the visual."
+    }
+  ]
+}
+Produce 2-3 beats, each 10-40 seconds. Focus on vivid, natural narration and specific visuals.
+total_duration_seconds should equal the sum of all beat duration_seconds.
+voice.provider must be openai or elevenlabs.
+No commentary outside JSON."""
+
+VIDEO_OVERVIEW_REDUCE_PROMPT = """Synthesise video beat extractions from multiple
+source chunks into one coherent, well-paced narrated video spec.
+Return STRICT JSON:
+{
+  "title": "video title",
+  "total_duration_seconds": 120,
+  "voice": {
+    "provider": "openai",
+    "voice_id": "alloy",
+    "speaking_rate": 1.0
+  },
+  "beats": [
+    {
+      "beat_index": 1,
+      "duration_seconds": 20,
+      "narration_script": "Full spoken narration (2-4 sentences, conversational).",
+      "visual_prompt": "Detailed image generation prompt describing the visual scene.",
+      "alt_text": "One-sentence accessibility description."
+    }
+  ]
+}
+Produce 4-10 beats. Ensure beat_index values are sequential starting at 1.
+Remove redundancy; ensure logical narrative arc (intro -> body -> conclusion).
+total_duration_seconds must equal the sum of all beat duration_seconds.
+voice.provider must be openai or elevenlabs.
+No commentary outside JSON."""
+
+# </BATCH C>
