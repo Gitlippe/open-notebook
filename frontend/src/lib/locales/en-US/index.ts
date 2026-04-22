@@ -207,6 +207,7 @@ export const enUS = {
     notebooks: "Notebooks",
     askAndSearch: "Ask and Search",
     podcasts: "Podcasts",
+    artifacts: "Artifacts",
     models: "Models",
     transformations: "Transformations",
     transformation: "Transformation",
@@ -928,4 +929,24 @@ export const enUS = {
     goToSettings: "Go to Settings",
     viewDocs: "View docs",
   },
+  // <artifacts>
+  artifacts: {
+    title: "Artifacts",
+    pageDesc: "Generate documents, decks, flashcards, and more from your notebooks.",
+    newArtifact: "New Artifact",
+    pickType: "Pick an artifact type",
+    selectSources: "Select sources",
+    configure: "Configure",
+    generate: "Generate",
+    generating: "Generating…",
+    completed: "Completed",
+    failed: "Failed",
+    download: "Download",
+    openInPowerPoint: "Open in PowerPoint",
+    provenance: "Provenance",
+    noArtifactsYet: "No artifacts yet",
+    noArtifactsHint: "Generate any of {count} artifact types from your notebooks — decks, flashcards, timelines, infographics, and more.",
+    generateError: "Artifact generation failed. Please try again.",
+  },
+  // </artifacts>
 }
