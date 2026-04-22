@@ -86,7 +86,7 @@ class TestLogEmission:
             from loguru import logger
 
             logger.add(_sink, level="INFO")
-            result = await generate_image("a colorful test pattern", size="256x256")
+            result = await generate_image("a colorful test pattern", size="1024x1024")
             logger.remove()
 
         assert result == fake_png
@@ -181,7 +181,7 @@ class TestRealImageGeneration:
 
         png_bytes = await generate_image(
             "A simple geometric test pattern, blue circles on white background",
-            size="512x512",
+            size="1024x1024",
         )
 
         assert isinstance(png_bytes, bytes)
@@ -201,7 +201,7 @@ class TestRealImageGeneration:
         result = await generate_image_to_file(
             "A minimal flat-design icon of a notebook",
             output,
-            size="512x512",
+            size="1024x1024",
         )
 
         assert result.exists()

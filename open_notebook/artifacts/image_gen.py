@@ -143,15 +143,19 @@ async def _generate_via_openai(
 
     client = openai.AsyncOpenAI(api_key=api_key)
 
-    # gpt-image-1 returns base64 by default; dall-e-3 returns URLs by default.
-    # We request b64_json for both to keep handling uniform.
-    response = await client.images.generate(
-        model=model,
-        prompt=prompt,
-        n=1,
-        size=size,
-        response_format="b64_json",
-    )
+    # gpt-image-1 always returns b64_json and rejects the response_format
+    # parameter. dall-e-3 defaults to URLs; we pass response_format=b64_json
+    # only for models that accept it.
+    kwargs: dict = {
+        "model": model,
+        "prompt": prompt,
+        "n": 1,
+        "size": size,
+    }
+    if model.startswith("dall-e"):
+        kwargs["response_format"] = "b64_json"
+
+    response = await client.images.generate(**kwargs)
 
     b64_data = response.data[0].b64_json
     if not b64_data:
