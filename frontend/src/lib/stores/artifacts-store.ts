@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import { ArtifactType } from '@/lib/types/artifacts'
+import { ArtifactJobResult, ArtifactType } from '@/lib/types/artifacts'
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -19,6 +19,15 @@ interface ArtifactsState {
   /** Free-form config key/values accumulated through the generate dialog. */
   configDraft: Record<string, unknown>
 
+  /** Per-session history of successfully completed artifact jobs (UI only). */
+  completedArtifacts: ArtifactJobResult[]
+
+  /** Whether the GenerateArtifactDialog is open. */
+  isGenerateDialogOpen: boolean
+
+  /** Job ID of the artifact currently being previewed in the modal. */
+  previewJobId: string | null
+
   // Setters ----------------------------------------------------------------
 
   setActiveJobId: (jobId: string | null) => void
@@ -29,7 +38,19 @@ interface ArtifactsState {
   setConfigDraft: (config: Record<string, unknown>) => void
   patchConfigDraft: (patch: Record<string, unknown>) => void
 
-  /** Reset UI state (e.g. when the dialog closes). */
+  /** Append an artifact to the session history (idempotent on job_id). */
+  addCompletedArtifact: (artifact: ArtifactJobResult) => void
+
+  /** Show the generate dialog. */
+  openGenerateDialog: () => void
+
+  /** Hide the generate dialog (also resets draft state). */
+  closeGenerateDialog: () => void
+
+  /** Switch which artifact is shown in the preview modal. */
+  setPreviewJobId: (jobId: string | null) => void
+
+  /** Reset draft UI state (dialog inputs). Leaves session history intact. */
   reset: () => void
 }
 
@@ -37,7 +58,7 @@ interface ArtifactsState {
 // Default values
 // ---------------------------------------------------------------------------
 
-const DEFAULT_STATE = {
+const DEFAULT_DRAFT_STATE = {
   activeJobId: null,
   selectedArtifactType: null,
   sourcesSelection: [] as string[],
@@ -52,7 +73,10 @@ const DEFAULT_STATE = {
 // ---------------------------------------------------------------------------
 
 export const useArtifactsStore = create<ArtifactsState>()((set) => ({
-  ...DEFAULT_STATE,
+  ...DEFAULT_DRAFT_STATE,
+  completedArtifacts: [],
+  isGenerateDialogOpen: false,
+  previewJobId: null,
 
   setActiveJobId: (jobId) => set({ activeJobId: jobId }),
 
@@ -80,5 +104,20 @@ export const useArtifactsStore = create<ArtifactsState>()((set) => ({
       configDraft: { ...state.configDraft, ...patch },
     })),
 
-  reset: () => set(DEFAULT_STATE),
+  addCompletedArtifact: (artifact) =>
+    set((state) => {
+      if (artifact.job_id && state.completedArtifacts.some((a) => a.job_id === artifact.job_id)) {
+        return state
+      }
+      return { completedArtifacts: [artifact, ...state.completedArtifacts] }
+    }),
+
+  openGenerateDialog: () => set({ isGenerateDialogOpen: true }),
+
+  closeGenerateDialog: () =>
+    set({ isGenerateDialogOpen: false, ...DEFAULT_DRAFT_STATE }),
+
+  setPreviewJobId: (jobId) => set({ previewJobId: jobId }),
+
+  reset: () => set(DEFAULT_DRAFT_STATE),
 }))

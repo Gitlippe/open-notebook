@@ -113,6 +113,7 @@ export interface ArtifactJobSubmitted {
 
 /** GET /api/artifacts/jobs/{job_id} — response */
 export interface ArtifactJobResult {
+  job_id?: string
   status: ArtifactJobStatus
   artifact_type?: string | null
   title?: string | null
