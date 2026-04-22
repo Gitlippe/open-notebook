@@ -1,30 +1,41 @@
 """Service layer for artifact generation.
 
-Orchestrates calls into ``open_notebook.artifacts`` for the FastAPI router.
-Optionally pulls content from a notebook's sources and notes when a
-``notebook_id`` is supplied.
+Mirrors the podcast async pattern:
+1. ``submit_generation_job`` pushes a job onto surreal-commands and returns
+   an opaque ``job_id`` string.
+2. ``get_job_status`` polls the queue for progress / result / error.
+3. The in-process ``generate`` helper is preserved so the command implementation
+   (and unit tests) can call it directly.
+
+The HTTP router never calls ``generate`` directly — it must go through
+``submit_generation_job`` so long-running LLM + rendering work does not tie
+up an HTTP worker.
 """
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
 from loguru import logger
+from surreal_commands import get_command_status, submit_command
 
 from open_notebook.artifacts import (
     generate_artifact,
     list_artifact_types,
 )
 from open_notebook.artifacts.base import ArtifactRequest, ArtifactResult, ArtifactSource
-from open_notebook.artifacts.registry import get_generator
-from open_notebook.config import DATA_FOLDER
+from open_notebook.config import ARTIFACT_OUTPUT_ROOT
 
+
+# ---------------------------------------------------------------------------
+# Notebook hydration (pull sources + notes to feed the generator)
+# ---------------------------------------------------------------------------
 
 async def _sources_from_notebook(notebook_id: str) -> List[ArtifactSource]:
     """Build ``ArtifactSource`` objects from a Notebook's records.
 
-    Falls back to an empty list on any failure so callers can still
-    operate on explicit ``sources`` payloads without a DB.
+    Returns an empty list on any DB failure so callers can still operate on
+    explicit ``sources`` payloads even when SurrealDB is down.
     """
     try:
         from open_notebook.domain.notebook import Notebook
@@ -73,11 +84,103 @@ async def _sources_from_notebook(notebook_id: str) -> List[ArtifactSource]:
     return sources
 
 
-def _artifact_output_dir() -> str:
-    base = os.path.join(DATA_FOLDER or ".", "artifacts")
-    os.makedirs(base, exist_ok=True)
-    return base
+# ---------------------------------------------------------------------------
+# Public API (router surface)
+# ---------------------------------------------------------------------------
 
+def available_types() -> List[Dict[str, str]]:
+    """Return the registered artifact-type catalogue."""
+    return list_artifact_types()
+
+
+async def submit_generation_job(
+    artifact_type: str,
+    sources: Optional[List[Dict[str, Any]]] = None,
+    notebook_id: Optional[str] = None,
+    title: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None,
+    model_id: Optional[str] = None,
+    output_dir: Optional[str] = None,
+) -> str:
+    """Submit an artifact-generation job to the surreal-commands queue.
+
+    Returns the opaque ``job_id`` string. The job runs asynchronously.
+    """
+    # Import the command module so surreal_commands can resolve the @command
+    # decorator's registry entry. Mirrors the podcast_service pattern.
+    try:
+        import commands.artifact_commands  # noqa: F401
+    except ImportError as exc:  # pragma: no cover
+        logger.error(f"Failed to import artifact commands: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="artifact commands module not available",
+        )
+
+    command_args: Dict[str, Any] = {
+        "artifact_type": artifact_type,
+        "sources": sources or [],
+        "notebook_id": notebook_id,
+        "title": title,
+        "config": config or {},
+        "model_id": model_id,
+        "output_dir": output_dir or ARTIFACT_OUTPUT_ROOT,
+    }
+
+    try:
+        job_id = submit_command("open_notebook", "generate_artifact", command_args)
+    except Exception as exc:
+        logger.error(f"submit_command failed for artifact_type={artifact_type}: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit artifact generation job: {exc}",
+        )
+
+    if not job_id:
+        raise HTTPException(
+            status_code=500, detail="submit_command returned no job_id"
+        )
+
+    job_id_str = str(job_id)
+    logger.info(
+        f"Submitted artifact generation job {job_id_str} "
+        f"(artifact_type={artifact_type}, title={title})"
+    )
+    return job_id_str
+
+
+async def get_job_status(job_id: str) -> Dict[str, Any]:
+    """Return the current status of an artifact-generation job."""
+    try:
+        status = await get_command_status(job_id)
+    except Exception as exc:
+        logger.error(f"Failed to get artifact job status: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get job status: {exc}"
+        )
+
+    if status is None:
+        return {"status": "unknown", "job_id": job_id}
+
+    result = getattr(status, "result", None) or {}
+    return {
+        "status": status.status,
+        "job_id": job_id,
+        "artifact_type": result.get("artifact_type"),
+        "title": result.get("title"),
+        "summary": result.get("summary"),
+        "structured": result.get("structured") or {},
+        "files": result.get("files") or [],
+        "metadata": result.get("metadata") or {},
+        "provenance": result.get("provenance"),
+        "generated_at": result.get("generated_at"),
+        "error": getattr(status, "error_message", None),
+    }
+
+
+# ---------------------------------------------------------------------------
+# In-process entry point (used by the surreal-commands worker + unit tests)
+# ---------------------------------------------------------------------------
 
 async def generate(
     artifact_type: str,
@@ -88,7 +191,12 @@ async def generate(
     model_id: Optional[str] = None,
     output_dir: Optional[str] = None,
 ) -> ArtifactResult:
-    """Synchronous (in-process) artifact generation."""
+    """In-process artifact generation.
+
+    Called by the surreal-commands worker (see ``commands/artifact_commands.py``)
+    and by unit tests. The HTTP router must NOT call this directly — it must
+    go through ``submit_generation_job``.
+    """
     src_models: List[ArtifactSource] = []
     if sources:
         for s in sources:
@@ -109,9 +217,5 @@ async def generate(
         title=title,
         config=config,
         model_id=model_id,
-        output_dir=output_dir or _artifact_output_dir(),
+        output_dir=output_dir or ARTIFACT_OUTPUT_ROOT,
     )
-
-
-def available_types() -> List[Dict[str, str]]:
-    return list_artifact_types()
