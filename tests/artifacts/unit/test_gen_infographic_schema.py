@@ -1,26 +1,13 @@
-"""Unit tests for InfographicGenerator — schema, registry, and config contract.
-
-No real LLM calls. All assertions are structural / contract-level.
-"""
+"""Unit tests for InfographicGenerator — schema, registry, and config contract."""
 from __future__ import annotations
-
 import pytest
-
 from open_notebook.artifacts.generators.infographic import (
-    InfographicGenerator,
-    InfographicSchema,
-    InfographicSectionSchema,
-    InfographicStatSchema,
+    InfographicGenerator, InfographicSchema, InfographicSectionSchema, InfographicStatSchema,
 )
 from open_notebook.artifacts.registry import ARTIFACT_TYPES
 
-
 pytestmark = pytest.mark.unit
 
-
-# ---------------------------------------------------------------------------
-# 1. Schema has required fields
-# ---------------------------------------------------------------------------
 
 class TestInfographicSchema:
     def test_schema_has_title(self):
@@ -57,9 +44,7 @@ class TestInfographicSchema:
     def test_schema_rejects_invalid_color_theme(self):
         with pytest.raises(Exception):
             InfographicSchema(
-                title="Bad",
-                sections=[],
-                stats=[],
+                title="Bad", sections=[], stats=[],
                 color_theme="purple",  # type: ignore
             )
 
@@ -92,10 +77,6 @@ class TestInfographicSchema:
         assert restored.color_theme == "blue"  # default
 
 
-# ---------------------------------------------------------------------------
-# 2. Generator class is in ARTIFACT_TYPES
-# ---------------------------------------------------------------------------
-
 class TestInfographicGeneratorRegistry:
     def test_generator_registered(self):
         assert "infographic" in ARTIFACT_TYPES
@@ -103,10 +84,6 @@ class TestInfographicGeneratorRegistry:
     def test_registered_class_is_infographic_generator(self):
         assert ARTIFACT_TYPES["infographic"] is InfographicGenerator
 
-
-# ---------------------------------------------------------------------------
-# 3. Generator's default_model_type is set
-# ---------------------------------------------------------------------------
 
 class TestInfographicGeneratorConfig:
     def test_default_model_type_is_set(self):

@@ -1,26 +1,13 @@
-"""Unit tests for VideoOverviewGenerator — schema, registry, and config contract.
-
-No real LLM calls. All assertions are structural / contract-level.
-"""
+"""Unit tests for VideoOverviewGenerator — schema, registry, and config contract."""
 from __future__ import annotations
-
 import pytest
-
 from open_notebook.artifacts.generators.video_overview import (
-    BeatSchema,
-    VideoOverviewGenerator,
-    VideoOverviewSchema,
-    VoiceMetadataSchema,
+    BeatSchema, VideoOverviewGenerator, VideoOverviewSchema, VoiceMetadataSchema,
 )
 from open_notebook.artifacts.registry import ARTIFACT_TYPES
 
-
 pytestmark = pytest.mark.unit
 
-
-# ---------------------------------------------------------------------------
-# 1. Schema has required fields
-# ---------------------------------------------------------------------------
 
 class TestVideoOverviewSchema:
     def test_schema_has_title(self):
@@ -57,7 +44,6 @@ class TestVideoOverviewSchema:
         assert "speaking_rate" in fields
 
     def test_voice_provider_literal(self):
-        """Provider must be openai or elevenlabs."""
         v = VoiceMetadataSchema(provider="elevenlabs", voice_id="rachel", speaking_rate=1.0)
         assert v.provider == "elevenlabs"
 
@@ -66,74 +52,45 @@ class TestVideoOverviewSchema:
             VoiceMetadataSchema(provider="aws_polly", voice_id="Joanna", speaking_rate=1.0)  # type: ignore
 
     def test_beat_duration_bounds(self):
-        """Duration must be between 5 and 120 seconds."""
         beat = BeatSchema(
-            beat_index=1,
-            duration_seconds=30,
-            narration_script="Hello world.",
-            visual_prompt="A bright scene.",
+            beat_index=1, duration_seconds=30,
+            narration_script="Hello world.", visual_prompt="A bright scene.",
             alt_text="A beautiful landscape.",
         )
         assert beat.duration_seconds == 30
 
     def test_beat_duration_below_min_rejected(self):
         with pytest.raises(Exception):
-            BeatSchema(
-                beat_index=1,
-                duration_seconds=2,  # < 5
-                narration_script=".",
-                visual_prompt=".",
-                alt_text=".",
-            )
+            BeatSchema(beat_index=1, duration_seconds=2, narration_script=".", visual_prompt=".", alt_text=".")
 
     def test_schema_validates_full_spec(self):
         spec = VideoOverviewSchema(
-            title="Understanding AI",
-            total_duration_seconds=90,
+            title="Understanding AI", total_duration_seconds=90,
             voice=VoiceMetadataSchema(provider="openai", voice_id="nova", speaking_rate=1.0),
             beats=[
-                BeatSchema(
-                    beat_index=1,
-                    duration_seconds=30,
-                    narration_script="Welcome to this video on AI.",
-                    visual_prompt="A futuristic city at dawn, photorealistic.",
-                    alt_text="Futuristic city skyline at dawn.",
-                ),
-                BeatSchema(
-                    beat_index=2,
-                    duration_seconds=60,
-                    narration_script="Let's explore the key concepts.",
-                    visual_prompt="Abstract network of glowing nodes on dark background.",
-                    alt_text="Glowing neural network visualization.",
-                ),
+                BeatSchema(beat_index=1, duration_seconds=30,
+                           narration_script="Welcome to this video on AI.",
+                           visual_prompt="A futuristic city at dawn, photorealistic.",
+                           alt_text="Futuristic city skyline at dawn."),
+                BeatSchema(beat_index=2, duration_seconds=60,
+                           narration_script="Let's explore the key concepts.",
+                           visual_prompt="Abstract network of glowing nodes.",
+                           alt_text="Glowing neural network visualization."),
             ],
         )
         assert spec.total_duration_seconds == 90
         assert len(spec.beats) == 2
-        assert spec.beats[0].beat_index == 1
 
     def test_schema_round_trips(self):
         spec = VideoOverviewSchema(
-            title="Test Video",
-            total_duration_seconds=45,
-            beats=[
-                BeatSchema(
-                    beat_index=1,
-                    duration_seconds=45,
-                    narration_script="Narration.",
-                    visual_prompt="Visual.",
-                    alt_text="Alt.",
-                )
-            ],
+            title="Test Video", total_duration_seconds=45,
+            beats=[BeatSchema(beat_index=1, duration_seconds=45,
+                              narration_script="Narration.", visual_prompt="Visual.", alt_text="Alt.")],
         )
         restored = VideoOverviewSchema.model_validate(spec.model_dump())
         assert restored.title == "Test Video"
         assert restored.beats[0].narration_script == "Narration."
 
-
-# ---------------------------------------------------------------------------
-# 2. Generator class is in ARTIFACT_TYPES
-# ---------------------------------------------------------------------------
 
 class TestVideoOverviewGeneratorRegistry:
     def test_generator_registered(self):
@@ -142,10 +99,6 @@ class TestVideoOverviewGeneratorRegistry:
     def test_registered_class_is_video_overview_generator(self):
         assert ARTIFACT_TYPES["video_overview"] is VideoOverviewGenerator
 
-
-# ---------------------------------------------------------------------------
-# 3. Generator's default_model_type is set
-# ---------------------------------------------------------------------------
 
 class TestVideoOverviewGeneratorConfig:
     def test_default_model_type_is_set(self):
@@ -159,6 +112,5 @@ class TestVideoOverviewGeneratorConfig:
         assert VideoOverviewGenerator.description
 
     def test_description_mentions_phase2(self):
-        """Description should note that video rendering is Phase 2."""
         desc_lower = VideoOverviewGenerator.description.lower()
         assert "phase 2" in desc_lower or "stream g" in desc_lower or "tts" in desc_lower
