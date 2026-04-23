@@ -91,53 +91,72 @@ class MindMapGenerator(BaseArtifactGenerator):
         data = result.model_dump()
         data["central_topic"] = central_topic
 
-        mermaid_path = self.output_path(request, "mmd")
-        mermaid_path.parent.mkdir(parents=True, exist_ok=True)
-        mermaid_path.write_text(mm.render_mermaid(data), encoding="utf-8")
+        # Use the high-level renderer which tries mermaid-cli first (best
+        # quality) and falls back to graphviz. It always writes .mmd and
+        # attempts .svg + .png. The generator also writes .dot, .md, .json
+        # separately for reference.
+        stem = self.output_path(request, "mmd").with_suffix("")
+        stem.parent.mkdir(parents=True, exist_ok=True)
+        rendered_paths = mm.render(data, stem)
 
-        dot_path = self.output_path(request, "dot")
+        # Ensure .dot, .md, .json auxiliaries also exist (render() only writes
+        # .mmd + attempted .svg/.png).
+        dot_path = stem.with_suffix(".dot")
         dot_path.write_text(mm.render_dot(data), encoding="utf-8")
 
-        md_path = self.output_path(request, "md")
+        md_path = stem.with_suffix(".md")
         md_path.write_text(mm.render_markdown_outline(data), encoding="utf-8")
 
-        json_path = self.output_path(request, "json")
+        json_path = stem.with_suffix(".json")
         json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-        files = [
-            ArtifactFile(
-                path=str(mermaid_path),
-                mime_type="text/x-mermaid",
-                description="Mermaid mindmap",
-            ),
-            ArtifactFile(
-                path=str(dot_path),
-                mime_type="text/vnd.graphviz",
-                description="Graphviz DOT",
-            ),
-            ArtifactFile(
-                path=str(md_path),
-                mime_type="text/markdown",
-                description="Markdown outline",
-            ),
-            ArtifactFile(
-                path=str(json_path),
-                mime_type="application/json",
-                description="Structured JSON",
-            ),
-        ]
-
-        png_path = self.output_path(request, "png")
-        rendered = mm.render_graph_png(data, png_path)
-        if rendered:
-            files.insert(
-                0,
+        # Build the ArtifactFile list: image first (PNG preferred, else SVG),
+        # then source files.
+        files: list[ArtifactFile] = []
+        rendered_by_ext = {p.suffix: p for p in rendered_paths}
+        if ".png" in rendered_by_ext:
+            files.append(
                 ArtifactFile(
-                    path=str(rendered),
+                    path=str(rendered_by_ext[".png"]),
                     mime_type="image/png",
                     description="Mind map (PNG)",
-                ),
+                )
             )
+        if ".svg" in rendered_by_ext:
+            files.append(
+                ArtifactFile(
+                    path=str(rendered_by_ext[".svg"]),
+                    mime_type="image/svg+xml",
+                    description="Mind map (SVG)",
+                )
+            )
+        if ".mmd" in rendered_by_ext:
+            files.append(
+                ArtifactFile(
+                    path=str(rendered_by_ext[".mmd"]),
+                    mime_type="text/x-mermaid",
+                    description="Mermaid mindmap source",
+                )
+            )
+        files.extend(
+            [
+                ArtifactFile(
+                    path=str(dot_path),
+                    mime_type="text/vnd.graphviz",
+                    description="Graphviz DOT",
+                ),
+                ArtifactFile(
+                    path=str(md_path),
+                    mime_type="text/markdown",
+                    description="Markdown outline",
+                ),
+                ArtifactFile(
+                    path=str(json_path),
+                    mime_type="application/json",
+                    description="Structured JSON",
+                ),
+            ]
+        )
 
         total_children = sum(len(b.children) for b in result.branches)
         return ArtifactResult(

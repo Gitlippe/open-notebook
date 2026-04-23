@@ -30,7 +30,6 @@
 
 {# ── Layout constants ─────────────────────────────────────── #}
 {% set W = 1200 %}
-{% set H = 1800 %}
 {% set PAD = 60 %}
 {% set INNER_W = W - 2 * PAD %}
 
@@ -40,10 +39,23 @@
 {% set STAT_COLS = [stats|length, 4]|min %}
 {% set STAT_W = INNER_W // STAT_COLS %}
 
-{# Sections starting Y ─────────────────────────────────────── #}
+{# Sections: height is content-driven. Each section gets a slot
+   sized to its text length so short blurbs don't leave a huge gap
+   and long ones don't crash into each other. #}
 {% set SECT_TOP = STATS_TOP + STATS_H + 48 %}
 {% set MAX_SECTIONS = [sections|length, 6]|min %}
-{% set SECT_H = (H - SECT_TOP - PAD - 48) // MAX_SECTIONS %}
+{# Min 150px, +30px per 80 chars of text. #}
+{% set SECT_H_LIST = [] %}
+{% for s in sections[:MAX_SECTIONS] %}
+  {% set body_len = (s.text or '')|length %}
+  {% set extra = (body_len // 80) * 30 %}
+  {% set slot = [150 + extra, 320]|min %}
+  {% set _ = SECT_H_LIST.append(slot) %}
+{% endfor %}
+{# Total canvas height = header + stats + sum of section slots + footer. #}
+{% set SECT_H_SUM = SECT_H_LIST|sum %}
+{% set H = SECT_TOP + SECT_H_SUM + 120 %}
+{% set FOOTER_Y = H - 48 %}
 
 <svg xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -171,9 +183,12 @@
   {% endfor %}
 
   <!-- ══ CONTENT SECTIONS ════════════════════════════════════ -->
-  {% for section in sections[:6] %}
-  {% set sy = SECT_TOP + loop.index0 * SECT_H %}
+  {% set ns_sy = namespace(y=SECT_TOP) %}
+  {% for section in sections[:MAX_SECTIONS] %}
+  {% set SECT_H = SECT_H_LIST[loop.index0] %}
+  {% set sy = ns_sy.y %}
   {% set BODY_H = SECT_H - 20 %}
+  {% set ns_sy.y = sy + SECT_H %}
 
   <!-- Section card -->
   <rect x="{{ PAD }}" y="{{ sy }}"
