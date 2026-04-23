@@ -6,8 +6,6 @@ artifact jobs run on the queue rather than tying up an HTTP worker.
 Retries: 5 attempts, exponential jitter 1-60s, stop_on ``ValueError`` so
 validation failures don't retry.
 """
-from __future__ import annotations
-
 import time
 from typing import Any, Dict, List, Optional
 

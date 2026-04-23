@@ -42,11 +42,13 @@ from open_notebook.artifacts.registry import register_generator
 # ---------------------------------------------------------------------------
 
 class TableSchema(BaseModel):
+    # NOTE: we don't use Pydantic min_length on array fields here because
+    # Anthropic's tool-use JSON-schema mode only supports minItems in {0,1}.
+    # We validate cardinality in Python after the LLM call instead.
     title: str = Field(..., description="Descriptive table title")
     columns: List[str] = Field(
         ...,
-        min_length=2,
-        description="Column header names (2+ columns required)",
+        description="Column header names (at least 2 required — enforced post-generation).",
     )
     rows: List[List[Any]] = Field(
         ...,
@@ -64,8 +66,7 @@ class TableSchema(BaseModel):
 class DataTablesSchema(BaseModel):
     tables: List[TableSchema] = Field(
         ...,
-        min_length=1,
-        description="One or more extracted tables (at least 1 required)",
+        description="One or more extracted tables (at least 1 required — enforced post-generation).",
     )
 
 

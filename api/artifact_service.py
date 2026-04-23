@@ -50,35 +50,65 @@ async def _sources_from_notebook(notebook_id: str) -> List[ArtifactSource]:
         return []
 
     sources: List[ArtifactSource] = []
+    # Notebook.get_sources() runs `select * omit source.full_text ...`, so the
+    # Source records it returns are shallow (no full_text). Re-fetch each one
+    # by id so artifact generators see the real content.
     try:
-        db_sources = await nb.get_sources()
-    except Exception:
-        db_sources = []
-    for s in db_sources or []:
-        content = getattr(s, "full_text", None) or getattr(s, "content", "") or ""
-        if not content:
+        from open_notebook.domain.notebook import Source
+
+        shallow_sources = await nb.get_sources()
+    except Exception as exc:
+        logger.warning(f"Failed to list sources for notebook {notebook_id}: {exc}")
+        shallow_sources = []
+
+    for shallow in shallow_sources or []:
+        source_id = str(getattr(shallow, "id", ""))
+        if not source_id:
             continue
+        try:
+            s = await Source.get(source_id)
+        except Exception as exc:
+            logger.warning(f"Could not hydrate source {source_id}: {exc}")
+            continue
+        content = getattr(s, "full_text", None) or ""
+        if not content.strip():
+            continue
+        asset = getattr(s, "asset", None)
+        url = getattr(asset, "url", None) if asset else None
         sources.append(
             ArtifactSource(
-                title=getattr(s, "title", None) or getattr(s, "topic", "Source"),
+                title=getattr(s, "title", None) or "Source",
                 content=content,
-                url=getattr(s, "url", None),
-                metadata={"source_id": str(getattr(s, "id", ""))},
+                url=url,
+                metadata={"source_id": source_id},
             )
         )
+    # Same trick for notes — get_notes() omits content.
     try:
-        notes = await nb.get_notes()
-    except Exception:
-        notes = []
-    for n in notes or []:
-        content = getattr(n, "content", "") or ""
+        from open_notebook.domain.notebook import Note
+
+        shallow_notes = await nb.get_notes()
+    except Exception as exc:
+        logger.warning(f"Failed to list notes for notebook {notebook_id}: {exc}")
+        shallow_notes = []
+
+    for shallow in shallow_notes or []:
+        note_id = str(getattr(shallow, "id", ""))
+        if not note_id:
+            continue
+        try:
+            n = await Note.get(note_id)
+        except Exception as exc:
+            logger.warning(f"Could not hydrate note {note_id}: {exc}")
+            continue
+        content = (getattr(n, "content", "") or "").strip()
         if not content:
             continue
         sources.append(
             ArtifactSource(
                 title=getattr(n, "title", None) or "Note",
                 content=content,
-                metadata={"note_id": str(getattr(n, "id", ""))},
+                metadata={"note_id": note_id},
             )
         )
     return sources

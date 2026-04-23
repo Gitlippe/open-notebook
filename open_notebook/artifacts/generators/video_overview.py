@@ -43,12 +43,13 @@ from open_notebook.artifacts.registry import register_generator
 # ---------------------------------------------------------------------------
 
 class BeatSchema(BaseModel):
+    # NOTE: we avoid numeric bounds (ge/le) on int/float fields because
+    # Anthropic's tool-use JSON-schema mode rejects `minimum`/`maximum` on
+    # integers. We clamp to sensible ranges in Python after the LLM call.
     beat_index: int = Field(..., description="1-based beat index for ordering")
     duration_seconds: int = Field(
         ...,
-        ge=5,
-        le=120,
-        description="Target narration duration for this beat in seconds (5-120s)",
+        description="Target narration duration for this beat in seconds (5-120s — clamped post-generation)",
     )
     narration_script: str = Field(
         ...,
@@ -81,9 +82,7 @@ class VoiceMetadataSchema(BaseModel):
     )
     speaking_rate: float = Field(
         default=1.0,
-        ge=0.5,
-        le=2.0,
-        description="Speaking rate multiplier (1.0 = normal speed)",
+        description="Speaking rate multiplier (0.5–2.0; 1.0 = normal speed; clamped post-generation)",
     )
 
 
@@ -91,7 +90,6 @@ class VideoOverviewSchema(BaseModel):
     title: str = Field(..., description="Video title — clear and engaging")
     total_duration_seconds: int = Field(
         ...,
-        ge=30,
         description="Estimated total video duration in seconds (sum of beat durations)",
     )
     voice: VoiceMetadataSchema = Field(
@@ -182,6 +180,25 @@ class VideoOverviewGenerator(BaseArtifactGenerator):
             reduce_prompt_builder=reduce_prompt,
         )
 
+        # Post-generation clamping (the schema itself cannot declare numeric
+        # bounds because Anthropic's tool-use JSON-schema rejects minimum/maximum).
+        def _clamp(v: float, lo: float, hi: float) -> float:
+            return max(lo, min(hi, v))
+
+        clamped_beats = [
+            b.model_copy(update={"duration_seconds": int(_clamp(b.duration_seconds, 5, 120))})
+            for b in result.beats
+        ]
+        result = result.model_copy(
+            update={
+                "beats": clamped_beats,
+                "total_duration_seconds": int(_clamp(result.total_duration_seconds, 30, 3600)),
+                "voice": result.voice.model_copy(
+                    update={"speaking_rate": _clamp(result.voice.speaking_rate, 0.5, 2.0)}
+                ),
+            }
+        )
+
         # Override voice metadata from config if provided
         if voice_id != "alloy" or voice_provider != "openai":
             result = result.model_copy(
@@ -189,7 +206,9 @@ class VideoOverviewGenerator(BaseArtifactGenerator):
                     "voice": VoiceMetadataSchema(
                         provider=voice_provider,
                         voice_id=voice_id,
-                        speaking_rate=request.config.get("speaking_rate", 1.0),
+                        speaking_rate=_clamp(
+                            float(request.config.get("speaking_rate", 1.0)), 0.5, 2.0
+                        ),
                     )
                 }
             )
