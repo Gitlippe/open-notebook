@@ -32,6 +32,11 @@ import { cn } from '@/lib/utils'
 
 type Step = 'type' | 'sources' | 'config' | 'progress'
 
+// Sentinel value for the "no notebook" option in the notebook picker Select.
+// Radix UI rejects empty-string SelectItem values, so we use this sentinel in
+// the UI layer and translate it back to "" in the component's notebookId state.
+const NOTEBOOK_NONE = '__none__'
+
 // ─── Per-type optional config fields ─────────────────────────────────────────
 
 const TYPE_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: string; placeholder?: string }>> = {
@@ -289,12 +294,20 @@ export function GenerateArtifactDialog({
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
                 <Label htmlFor="notebook-select">Notebook (optional)</Label>
-                <Select value={notebookId} onValueChange={setNotebookId}>
+                {/* Radix Select disallows empty-string item values. Use a
+                    sentinel for the "no notebook" option and map it to "" in
+                    component state so the rest of the logic stays untouched. */}
+                <Select
+                  value={notebookId || NOTEBOOK_NONE}
+                  onValueChange={(v) =>
+                    setNotebookId(v === NOTEBOOK_NONE ? '' : v)
+                  }
+                >
                   <SelectTrigger id="notebook-select">
                     <SelectValue placeholder="Select a notebook…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value={NOTEBOOK_NONE}>None</SelectItem>
                     {(notebooks ?? []).map((nb) => (
                       <SelectItem key={nb.id} value={nb.id}>
                         {nb.name ?? nb.id}
